@@ -1,0 +1,2 @@
+export { OnboardingSlide } from './OnboardingSlide';
+
