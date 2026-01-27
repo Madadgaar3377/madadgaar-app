@@ -62,5 +62,6 @@
       ]
     ],
     "owner": "madadgaar_expert"
-  }
+  },
+  "jsEngine": "hermes"
 }
