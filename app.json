@@ -1,13 +1,18 @@
 {
   "expo": {
     "name": "madadgaar",
-    "slug": "madadgaar",
+    "slug": "madadgaar-app",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/App_logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "madadgaar",
+    "extra": {
+      "eas": {
+        "projectId": "0af1cdcc-1aeb-49db-9181-bf996aa2a6cc"
+      }
+    },
     "splash": {
       "image": "./assets/App_logo.png",
       "resizeMode": "contain",
@@ -28,10 +33,6 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -59,6 +60,7 @@
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to provide location-based services."
         }
       ]
-    ]
+    ],
+    "owner": "madadgaar_expert"
   }
 }
