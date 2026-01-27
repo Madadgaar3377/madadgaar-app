@@ -19,6 +19,7 @@ import { useAppSelector } from '@/store/hooks';
 import { colors, spacing } from '@/theme';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { DetailPageSkeleton } from '@/components/common/SkeletonLoader';
+import { PageLoader } from '@/components/common/PageLoader';
 import Toast from 'react-native-toast-message';
 
 const RED_PRIMARY = '#D32F2F';
@@ -99,34 +100,30 @@ export default function ApplyInstallmentScreen() {
   };
 
   const validateForm = (): boolean => {
-    const requiredFields: (keyof ApplyInstallmentUserInfo)[] = [
-      'name',
-      'email',
-      'phone',
-      'address',
-      'city',
-      'state',
-      'zip',
-      'country',
-      'occupation',
-      'employerName',
-      'employerAddress',
-      'jobTitle',
-      'monthlyIncome',
-      'workContactNumber',
-    ];
+    // Required fields based on backend validation
+    // Backend requires: name, email, phone, address, city
+    // Other fields are optional but recommended
+    
+    if (!formData.name || formData.name.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter your full name',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return false;
+    }
 
-    for (const field of requiredFields) {
-      if (!formData[field] || formData[field].trim() === '') {
-        Toast.show({
-          type: 'error',
-          text1: 'Validation Error',
-          text2: `Please fill in ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`,
-          position: 'top',
-          visibilityTime: 2500,
-        });
-        return false;
-      }
+    if (!formData.email || formData.email.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter your email address',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return false;
     }
 
     // Validate email format
@@ -136,6 +133,39 @@ export default function ApplyInstallmentScreen() {
         type: 'error',
         text1: 'Validation Error',
         text2: 'Please enter a valid email address',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return false;
+    }
+
+    if (!formData.phone || formData.phone.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter your phone number',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return false;
+    }
+
+    if (!formData.address || formData.address.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter your address',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return false;
+    }
+
+    if (!formData.city || formData.city.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter your city',
         position: 'top',
         visibilityTime: 2500,
       });
@@ -163,11 +193,14 @@ export default function ApplyInstallmentScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!product || !product.id) {
+    // Get the correct installmentPlanId - backend expects this specific field
+    const planId = product?.installmentPlanId || product?.id || product?._id;
+    
+    if (!product || !planId) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Product information is missing',
+        text2: 'Product information is missing. Please try again.',
         position: 'top',
         visibilityTime: 2500,
       });
@@ -182,10 +215,23 @@ export default function ApplyInstallmentScreen() {
       setSubmitting(true);
 
       const payload = {
-        installmentPlanId: product.id,
+        installmentPlanId: planId,
         applicationNote: applicationNote.trim() || undefined,
-        selectedPlanIndex,
-        userInfo: formData,
+        selectedPlanIndex: selectedPlanIndex || 0,
+        userInfo: {
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zip: formData.zip,
+          country: formData.country,
+          occupation: formData.occupation,
+          employerName: formData.employerName,
+          employerAddress: formData.employerAddress,
+          jobTitle: formData.jobTitle,
+          monthlyIncome: formData.monthlyIncome,
+          otherIncomeSources: formData.otherIncomeSources || '',
+          workContactNumber: formData.workContactNumber,
+        },
       };
 
       const response = await applyInstallment(payload);
@@ -194,23 +240,36 @@ export default function ApplyInstallmentScreen() {
         Toast.show({
           type: 'success',
           text1: 'Application Submitted',
-          text2: 'Your installment application has been submitted successfully. We will review it and get back to you soon.',
+          text2: response.message || 'Your installment application has been submitted successfully. Our agent will contact you soon.',
           position: 'top',
-          visibilityTime: 2500,
+          visibilityTime: 3000,
           onHide: () => {
             router.back();
           },
         });
       } else {
-        throw new Error(response.message || 'Failed to submit application');
+        throw new Error(response.message || response.error || 'Failed to submit application');
       }
     } catch (error: any) {
+      console.error('Application submission error:', error);
+      
+      // Handle specific error messages from backend
+      let errorMessage = 'Failed to submit application. Please try again.';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+
       Toast.show({
         type: 'error',
         text1: 'Submission Failed',
-        text2: error.message || 'Failed to submit application. Please try again.',
+        text2: errorMessage,
         position: 'top',
-        visibilityTime: 2500,
+        visibilityTime: 3000,
       });
     } finally {
       setSubmitting(false);
@@ -237,6 +296,7 @@ export default function ApplyInstallmentScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      {submitting && <PageLoader fullScreen message="Submitting application..." />}
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -339,10 +399,10 @@ export default function ApplyInstallmentScreen() {
               </View>
               <View style={styles.halfWidth}>
                 <Input
-                  label="State *"
+                  label="State"
                   value={formData.state}
                   onChangeText={(value) => updateField('state', value)}
-                  placeholder="Enter state"
+                  placeholder="Enter state (optional)"
                 />
               </View>
             </View>
@@ -350,19 +410,19 @@ export default function ApplyInstallmentScreen() {
             <View style={styles.row}>
               <View style={styles.halfWidth}>
                 <Input
-                  label="ZIP Code *"
+                  label="ZIP Code"
                   value={formData.zip}
                   onChangeText={(value) => updateField('zip', value)}
-                  placeholder="Enter ZIP code"
+                  placeholder="Enter ZIP code (optional)"
                   keyboardType="numeric"
                 />
               </View>
               <View style={styles.halfWidth}>
                 <Input
-                  label="Country *"
+                  label="Country"
                   value={formData.country}
                   onChangeText={(value) => updateField('country', value)}
-                  placeholder="Enter country"
+                  placeholder="Enter country (optional)"
                 />
               </View>
             </View>
@@ -373,40 +433,40 @@ export default function ApplyInstallmentScreen() {
             <Text style={styles.sectionTitle}>Employment Information</Text>
 
             <Input
-              label="Occupation *"
+              label="Occupation"
               value={formData.occupation}
               onChangeText={(value) => updateField('occupation', value)}
-              placeholder="Enter your occupation"
+              placeholder="Enter your occupation (optional)"
             />
 
             <Input
-              label="Employer Name *"
+              label="Employer Name"
               value={formData.employerName}
               onChangeText={(value) => updateField('employerName', value)}
-              placeholder="Enter employer name"
+              placeholder="Enter employer name (optional)"
             />
 
             <Input
-              label="Employer Address *"
+              label="Employer Address"
               value={formData.employerAddress}
               onChangeText={(value) => updateField('employerAddress', value)}
-              placeholder="Enter employer address"
+              placeholder="Enter employer address (optional)"
               multiline
               numberOfLines={2}
             />
 
             <Input
-              label="Job Title *"
+              label="Job Title"
               value={formData.jobTitle}
               onChangeText={(value) => updateField('jobTitle', value)}
-              placeholder="Enter your job title"
+              placeholder="Enter your job title (optional)"
             />
 
             <Input
-              label="Monthly Income (PKR) *"
+              label="Monthly Income (PKR)"
               value={formData.monthlyIncome}
               onChangeText={(value) => updateField('monthlyIncome', value)}
-              placeholder="Enter monthly income"
+              placeholder="Enter monthly income (optional)"
               keyboardType="numeric"
             />
 
@@ -418,10 +478,10 @@ export default function ApplyInstallmentScreen() {
             />
 
             <Input
-              label="Work Contact Number *"
+              label="Work Contact Number"
               value={formData.workContactNumber}
               onChangeText={(value) => updateField('workContactNumber', value)}
-              placeholder="Enter work contact number"
+              placeholder="Enter work contact number (optional)"
               keyboardType="phone-pad"
             />
           </View>

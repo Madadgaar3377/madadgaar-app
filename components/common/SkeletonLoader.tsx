@@ -157,6 +157,39 @@ export const PropertyCardSkeleton: React.FC<PropertyCardSkeletonProps> = ({ coun
   );
 };
 
+interface PropertyGridSkeletonProps {
+  count?: number;
+}
+
+export const PropertyGridSkeleton: React.FC<PropertyGridSkeletonProps> = ({ count = 6 }) => {
+  return (
+    <View style={styles.propertyGridSkeletonContainer}>
+      {Array.from({ length: count }).map((_, index) => (
+        <View key={index} style={styles.propertyGridCardSkeleton}>
+          <View style={styles.propertyGridImageWrapper}>
+            <SkeletonLoader width="100%" height={160} borderRadius={12} />
+          </View>
+          <View style={styles.propertyGridCardContent}>
+            <SkeletonLoader width="90%" height={16} borderRadius={4} style={{ marginBottom: 6 }} />
+            <SkeletonLoader width="70%" height={12} borderRadius={4} style={{ marginBottom: 8 }} />
+            <View style={styles.propertyGridPriceRow}>
+              <SkeletonLoader width={80} height={18} borderRadius={4} />
+              <SkeletonLoader width={100} height={14} borderRadius={4} />
+            </View>
+            <View style={styles.propertyGridDetailsRow}>
+              <SkeletonLoader width={50} height={12} borderRadius={4} />
+              <SkeletonLoader width={50} height={12} borderRadius={4} />
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <SkeletonLoader width={60} height={24} borderRadius={16} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   skeleton: {
     backgroundColor: '#E0E0E0',
@@ -256,6 +289,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
+  },
+  propertyGridSkeletonContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    padding: 16,
+    gap: 12,
+  },
+  propertyGridCardSkeleton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    width: '48%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  propertyGridImageWrapper: {
+    width: '100%',
+    height: 160,
+    backgroundColor: '#F9F9F9',
+  },
+  propertyGridCardContent: {
+    padding: 12,
+    minHeight: 120,
+  },
+  propertyGridPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  propertyGridDetailsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
   },
   dashboardSkeletonContainer: {
     paddingHorizontal: 20,

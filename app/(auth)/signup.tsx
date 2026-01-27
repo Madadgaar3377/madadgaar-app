@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { signup } from '@/store/auth/authActions';
 import { Button } from '@/components/common/Button';
 import { AuthHeader } from '@/components/auth/AuthHeader';
+import { PageLoader } from '@/components/common/PageLoader';
 import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { PersonIcon, LockIcon, AtIcon } from '@/components/icons';
@@ -104,6 +105,7 @@ export default function SignupScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {loading && <PageLoader fullScreen message="Creating account..." />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

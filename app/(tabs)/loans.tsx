@@ -111,9 +111,13 @@ export default function LoansScreen() {
           <Text style={styles.headerTitle}>Loans</Text>
         </View>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {[1, 2, 3].map((i) => (
-            <PropertyCardSkeleton key={i} />
-          ))}
+          <View style={styles.gridContainer}>
+            {[1, 2, 3, 4].map((i) => (
+              <View key={i} style={styles.loanCard}>
+                <PropertyCardSkeleton />
+              </View>
+            ))}
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -157,98 +161,81 @@ export default function LoansScreen() {
             </Text>
           </View>
         ) : (
-          filteredLoans.map((loan) => (
-            <TouchableOpacity
-              key={loan.planId}
-              style={styles.loanCard}
-              onPress={() => router.push(`/loan-details/${loan.planId}` as any)}
-              activeOpacity={0.7}
-            >
-              {/* Bank Logo / Image */}
-              {loan.planImage ? (
-                <LazyImage
-                  source={{ uri: loan.planImage }}
-                  style={styles.loanImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.loanImage, styles.placeholderImage]}>
-                  <Ionicons name="business-outline" size={32} color="#ccc" />
-                </View>
-              )}
+          <View style={styles.gridContainer}>
+            {filteredLoans.map((loan) => (
+              <TouchableOpacity
+                key={loan.planId}
+                style={styles.loanCard}
+                onPress={() => router.push(`/loan-details/${loan.planId}` as any)}
+                activeOpacity={0.7}
+              >
+                {/* Bank Logo / Image */}
+                {loan.planImage ? (
+                  <LazyImage
+                    source={{ uri: loan.planImage }}
+                    style={styles.loanImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.loanImage, styles.placeholderImage]}>
+                    <Ionicons name="business-outline" size={24} color="#ccc" />
+                  </View>
+                )}
 
-              <View style={styles.loanContent}>
-                {/* Bank Name */}
-                <View style={styles.bankRow}>
-                  <Text style={styles.bankName}>{loan.bankName}</Text>
-                  {loan.financingType === 'Islamic' && (
-                    <View style={styles.islamicBadge}>
-                      <Ionicons name="star" size={12} color={RED_PRIMARY} />
-                      <Text style={styles.islamicBadgeText}>Islamic</Text>
+                <View style={styles.loanContent}>
+                  {/* Bank Name */}
+                  <View style={styles.bankRow}>
+                    <Text style={styles.bankName} numberOfLines={1}>{loan.bankName}</Text>
+                    {loan.financingType === 'Islamic' && (
+                      <View style={styles.islamicBadge}>
+                        <Ionicons name="star" size={10} color={RED_PRIMARY} />
+                        <Text style={styles.islamicBadgeText}>Islamic</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Product Name */}
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {loan.productName}
+                  </Text>
+
+                  {/* Category */}
+                  {loan.majorCategory && (
+                    <View style={styles.categoryRow}>
+                      <Ionicons name="pricetag-outline" size={12} color="#666" />
+                      <Text style={styles.categoryText} numberOfLines={1}>
+                        {loan.majorCategory}
+                      </Text>
                     </View>
                   )}
+
+                  {/* Financing Amount */}
+                  {(loan.minFinancingAmount !== undefined || loan.maxFinancingAmount !== undefined) && (
+                    <View style={styles.amountRow}>
+                      <Ionicons name="cash-outline" size={14} color={RED_PRIMARY} />
+                      <Text style={styles.amountText} numberOfLines={1}>
+                        {loan.minFinancingAmount !== undefined && loan.maxFinancingAmount !== undefined
+                          ? `${formatAmount(loan.minFinancingAmount)} - ${formatAmount(loan.maxFinancingAmount)}`
+                          : loan.minFinancingAmount !== undefined
+                          ? `From ${formatAmount(loan.minFinancingAmount)}`
+                          : loan.maxFinancingAmount !== undefined
+                          ? `Up to ${formatAmount(loan.maxFinancingAmount)}`
+                          : 'N/A'}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* View Details Button */}
+                  <TouchableOpacity
+                    style={styles.viewButton}
+                    onPress={() => router.push(`/loan-details/${loan.planId}` as any)}
+                  >
+                    <Text style={styles.viewButtonText}>View</Text>
+                  </TouchableOpacity>
                 </View>
-
-                {/* Product Name */}
-                <Text style={styles.productName} numberOfLines={2}>
-                  {loan.productName}
-                </Text>
-
-                {/* Category */}
-                {loan.majorCategory && (
-                  <View style={styles.categoryRow}>
-                    <Ionicons name="pricetag-outline" size={14} color="#666" />
-                    <Text style={styles.categoryText} numberOfLines={1}>
-                      {loan.majorCategory}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Financing Amount */}
-                {(loan.minFinancingAmount !== undefined || loan.maxFinancingAmount !== undefined) && (
-                  <View style={styles.amountRow}>
-                    <Ionicons name="cash-outline" size={16} color={RED_PRIMARY} />
-                    <Text style={styles.amountText}>
-                      {loan.minFinancingAmount !== undefined && loan.maxFinancingAmount !== undefined
-                        ? `${formatAmount(loan.minFinancingAmount)} - ${formatAmount(loan.maxFinancingAmount)}`
-                        : loan.minFinancingAmount !== undefined
-                        ? `From ${formatAmount(loan.minFinancingAmount)}`
-                        : loan.maxFinancingAmount !== undefined
-                        ? `Up to ${formatAmount(loan.maxFinancingAmount)}`
-                        : 'N/A'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Tenure */}
-                {(loan.minTenure !== undefined || loan.maxTenure !== undefined) && (
-                  <View style={styles.tenureRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#666" />
-                    <Text style={styles.tenureText}>
-                      {formatTenure(loan.minTenure, loan.maxTenure, loan.tenureUnit)}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Rate */}
-                {loan.indicativeRate && (
-                  <View style={styles.rateRow}>
-                    <Ionicons name="trending-up-outline" size={16} color="#666" />
-                    <Text style={styles.rateText}>{loan.indicativeRate}</Text>
-                  </View>
-                )}
-
-                {/* View Details Button */}
-                <TouchableOpacity
-                  style={styles.viewButton}
-                  onPress={() => router.push(`/loan-details/${loan.planId}` as any)}
-                >
-                  <Text style={styles.viewButtonText}>View Details</Text>
-                  <Ionicons name="arrow-forward" size={16} color={RED_PRIMARY} />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -297,8 +284,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xxl,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -319,8 +312,8 @@ const styles = StyleSheet.create({
   },
   loanCard: {
     backgroundColor: WHITE,
-    borderRadius: 16,
-    marginBottom: spacing.lg,
+    borderRadius: 12,
+    width: '48%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -330,10 +323,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
+    marginBottom: spacing.md,
   },
   loanImage: {
     width: '100%',
-    height: 180,
+    height: 120,
     backgroundColor: '#f0f0f0',
   },
   placeholderImage: {
@@ -342,94 +336,96 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   loanContent: {
-    padding: spacing.md,
+    padding: spacing.sm,
   },
   bankRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.xs,
+    gap: 4,
   },
   bankName: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
     color: RED_PRIMARY,
+    flex: 1,
   },
   islamicBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: RED_LIGHT,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 2,
   },
   islamicBadgeText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '600',
     color: RED_PRIMARY,
   },
   productName: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: GRAY_DARK,
     marginBottom: spacing.xs,
+    minHeight: 36,
   },
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.xs,
-    gap: 6,
+    gap: 4,
   },
   categoryText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#666',
     flex: 1,
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     marginBottom: spacing.xs,
-    gap: 6,
+    gap: 4,
   },
   amountText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: GRAY_DARK,
+    flex: 1,
   },
   tenureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.xs,
-    gap: 6,
+    gap: 4,
   },
   tenureText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#666',
   },
   rateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.sm,
-    gap: 6,
+    gap: 4,
   },
   rateText: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#666',
   },
   viewButton: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 6,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    backgroundColor: RED_LIGHT,
+    borderRadius: 6,
   },
   viewButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: RED_PRIMARY,
   },

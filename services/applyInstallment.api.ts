@@ -22,11 +22,26 @@ export interface ApplyInstallmentUserInfo {
   workContactNumber: string;
 }
 
+export interface ApplyInstallmentUserInfoPayload {
+  address: string;
+  city: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  occupation?: string;
+  employerName?: string;
+  employerAddress?: string;
+  jobTitle?: string;
+  monthlyIncome?: string;
+  otherIncomeSources?: string;
+  workContactNumber?: string;
+}
+
 export interface ApplyInstallmentPayload {
   installmentPlanId: string;
   applicationNote?: string;
-  selectedPlanIndex: number;
-  userInfo: ApplyInstallmentUserInfo;
+  selectedPlanIndex?: number;
+  userInfo: ApplyInstallmentUserInfoPayload;
 }
 
 export interface ApplyInstallmentResponse {

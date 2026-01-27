@@ -16,11 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { getUserDashboard, InstallmentApplication, PropertyApplication, LoanApplication } from '@/services/dashboard.api';
 import { InstallmentCardIcon, PropertyCardIcon, LoanCardIcon, InsuranceCardIcon } from '@/components/icons/ApplicationCardIcons';
 import { getPropertyTitle, getPropertyLocation, getPropertyImages } from '@/services/property.api';
+import { getInstallmentById, Installment } from '@/services/installment.api';
 import { useAppSelector } from '@/store/hooks';
 import Toast from 'react-native-toast-message';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { colors, spacing } from '@/theme';
-import { DashboardSkeletonNew } from '@/components/common/SkeletonLoader';
+import { SkeletonLoader } from '@/components/common/SkeletonLoader';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BASE_IMAGE_URL = 'https://api.madadgaar.com.pk/';
@@ -34,6 +35,9 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category>('installments');
+  const [installmentPlansCache, setInstallmentPlansCache] = useState<Record<string, Installment>>({});
+  const [loanPlansCache, setLoanPlansCache] = useState<Record<string, any>>({});
+  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const loadDashboard = useCallback(async () => {
@@ -121,6 +125,34 @@ export default function DashboardScreen() {
     }
   };
 
+  const fetchInstallmentPlan = useCallback(async (installmentPlanId: string) => {
+    // Only try to fetch if we have a valid installmentPlanId
+    // Skip if it looks like a MongoDB ObjectId (24 hex chars) as backend prefers installmentPlanId
+    if (!installmentPlanId || 
+        loadingImages.has(installmentPlanId) || 
+        installmentPlansCache[installmentPlanId] ||
+        /^[0-9a-fA-F]{24}$/.test(installmentPlanId)) {
+      return;
+    }
+
+    try {
+      setLoadingImages(prev => new Set(prev).add(installmentPlanId));
+      const plan = await getInstallmentById(installmentPlanId);
+      if (plan) {
+        setInstallmentPlansCache(prev => ({ ...prev, [installmentPlanId]: plan }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch installment plan:', error);
+      // Silently fail - we'll use PlanInfo data instead
+    } finally {
+      setLoadingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(installmentPlanId);
+        return newSet;
+      });
+    }
+  }, [loadingImages, installmentPlansCache]);
+
   const getInstallmentProductImage = (app: InstallmentApplication): string | null => {
     const appAny = app as any;
     const normalizeImage = (img: string | null | undefined): string | null => {
@@ -131,6 +163,20 @@ export default function DashboardScreen() {
       const cleanPath = img.replace(/^[\/\\]+/, '');
       return `${BASE_IMAGE_URL}${cleanPath}`;
     };
+
+    // Check cached installment plan first
+    if (app.installmentPlanId && installmentPlansCache[app.installmentPlanId]) {
+      const cachedPlan = installmentPlansCache[app.installmentPlanId];
+      if (cachedPlan.productImages && cachedPlan.productImages.length > 0) {
+        return normalizeImage(cachedPlan.productImages[0]);
+      }
+      if (cachedPlan.imageUrl) return normalizeImage(cachedPlan.imageUrl);
+    }
+
+    // Try to fetch from API if we have installmentPlanId but no image
+    if (app.installmentPlanId && !loadingImages.has(app.installmentPlanId) && !installmentPlansCache[app.installmentPlanId]) {
+      fetchInstallmentPlan(app.installmentPlanId);
+    }
 
     if (appAny.planImageUrl) return normalizeImage(appAny.planImageUrl);
     if (appAny.productImageUrl) return normalizeImage(appAny.productImageUrl);
@@ -143,26 +189,50 @@ export default function DashboardScreen() {
     
     if (app.PlanInfo && app.PlanInfo.length > 0) {
       const plan = app.PlanInfo[0] as any;
-      if (plan.imageUrl) return normalizeImage(plan.imageUrl);
-      if (plan.image) return normalizeImage(plan.image);
-      if (plan.productImageUrl) return normalizeImage(plan.productImageUrl);
+      // Check planpic field first (stored by backend when application is created)
+      if (plan.planpic) {
+        if (Array.isArray(plan.planpic) && plan.planpic.length > 0) {
+          return normalizeImage(plan.planpic[0]);
+        }
+        if (typeof plan.planpic === 'string') {
+          return normalizeImage(plan.planpic);
+        }
+      }
+      // Check other image fields in PlanInfo
       if (plan.productImages && Array.isArray(plan.productImages) && plan.productImages.length > 0) {
         return normalizeImage(plan.productImages[0]);
       }
+      if (plan.imageUrl) return normalizeImage(plan.imageUrl);
+      if (plan.image) return normalizeImage(plan.image);
+      if (plan.productImageUrl) return normalizeImage(plan.productImageUrl);
     }
     
     if (appAny.InstallmentInfo && Array.isArray(appAny.InstallmentInfo) && appAny.InstallmentInfo.length > 0) {
       const info = appAny.InstallmentInfo[0];
-      if (info.imageUrl) return normalizeImage(info.imageUrl);
-      if (info.image) return normalizeImage(info.image);
-      if (info.productImageUrl) return normalizeImage(info.productImageUrl);
       if (info.productImages && Array.isArray(info.productImages) && info.productImages.length > 0) {
         return normalizeImage(info.productImages[0]);
       }
+      if (info.imageUrl) return normalizeImage(info.imageUrl);
+      if (info.image) return normalizeImage(info.image);
+      if (info.productImageUrl) return normalizeImage(info.productImageUrl);
     }
     
-    if (appAny.installmentPlan && appAny.installmentPlan.imageUrl) {
-      return normalizeImage(appAny.installmentPlan.imageUrl);
+    // Check nested installmentPlan object
+    if (appAny.installmentPlan) {
+      if (appAny.installmentPlan.productImages && Array.isArray(appAny.installmentPlan.productImages) && appAny.installmentPlan.productImages.length > 0) {
+        return normalizeImage(appAny.installmentPlan.productImages[0]);
+      }
+      if (appAny.installmentPlan.imageUrl) return normalizeImage(appAny.installmentPlan.imageUrl);
+      if (appAny.installmentPlan.image) return normalizeImage(appAny.installmentPlan.image);
+    }
+
+    // Check planDetails (if populated by backend in some endpoints)
+    if (appAny.planDetails) {
+      if (appAny.planDetails.productImages && Array.isArray(appAny.planDetails.productImages) && appAny.planDetails.productImages.length > 0) {
+        return normalizeImage(appAny.planDetails.productImages[0]);
+      }
+      if (appAny.planDetails.imageUrl) return normalizeImage(appAny.planDetails.imageUrl);
+      if (appAny.planDetails.image) return normalizeImage(appAny.planDetails.image);
     }
     
     return null;
@@ -200,11 +270,17 @@ export default function DashboardScreen() {
       ? (app as any).InstallmentInfo[0] 
       : null;
     
+    // Check cached installment plan for complete details
+    let cachedPlan = null;
+    if (app.installmentPlanId && installmentPlansCache[app.installmentPlanId]) {
+      cachedPlan = installmentPlansCache[app.installmentPlanId];
+    }
+    
     return {
-      monthlyPayment: planInfo?.monthlyInstallment || installmentInfo?.monthlyInstallment || (app as any).monthlyPayment || null,
-      tenure: planInfo?.tenureMonths || installmentInfo?.tenureMonths || (app as any).tenure || null,
-      downPayment: planInfo?.downPayment || installmentInfo?.downPayment || (app as any).downPayment || null,
-      totalAmount: planInfo?.planPrice || installmentInfo?.planPrice || (app as any).totalAmount || null,
+      monthlyPayment: planInfo?.monthlyInstallment || installmentInfo?.monthlyInstallment || cachedPlan?.monthlyPayment || (app as any).monthlyPayment || null,
+      tenure: planInfo?.tenureMonths || installmentInfo?.tenureMonths || cachedPlan?.duration || (app as any).tenure || null,
+      downPayment: planInfo?.downPayment || installmentInfo?.downPayment || cachedPlan?.downPayment || (app as any).downPayment || null,
+      totalAmount: planInfo?.planPrice || installmentInfo?.planPrice || cachedPlan?.totalAmount || (app as any).totalAmount || null,
     };
   };
 
@@ -340,17 +416,43 @@ export default function DashboardScreen() {
     return { location: '', price: null, monthlyRent: null };
   };
 
+  // Fetch loan plan by planId
+  const fetchLoanPlan = useCallback(async (planId: string) => {
+    if (!planId || loanPlansCache[planId]) return;
+    
+    try {
+      const { getLoanById } = await import('@/services/loan.api');
+      const plan = await getLoanById(planId);
+      if (plan) {
+        setLoanPlansCache(prev => ({ ...prev, [planId]: plan }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch loan plan:', error);
+    }
+  }, [loanPlansCache]);
+
   // Helper functions for loan applications
   const getLoanProductName = (app: LoanApplication): string => {
-    if ((app as any).loanRequirement?.loanType) return (app as any).loanRequirement.loanType;
-    if ((app as any).productName) return (app as any).productName;
-    if ((app as any).planName) return (app as any).planName;
-    if ((app as any).bankName) return `${(app as any).bankName} Loan`;
+    const appAny = app as any;
+    const planId = appAny.planId;
+    
+    // Try to get from cached loan plan
+    if (planId && loanPlansCache[planId]) {
+      return loanPlansCache[planId].productName || loanPlansCache[planId].bankName + ' Loan';
+    }
+    
+    // Fallback to application data
+    if (appAny.loanRequirement?.loanType) return appAny.loanRequirement.loanType + ' Loan';
+    if (appAny.productName) return appAny.productName;
+    if (appAny.planName) return appAny.planName;
+    if (appAny.bankName) return `${appAny.bankName} Loan`;
     return 'Loan Application';
   };
 
   const getLoanProductImage = (app: LoanApplication): string | null => {
     const appAny = app as any;
+    const planId = appAny.planId;
+    
     const normalizeImage = (img: string | null | undefined): string | null => {
       if (!img || typeof img !== 'string') return null;
       if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) {
@@ -360,6 +462,12 @@ export default function DashboardScreen() {
       return `${BASE_IMAGE_URL}${cleanPath}`;
     };
 
+    // Try to get from cached loan plan
+    if (planId && loanPlansCache[planId]?.planImage) {
+      return normalizeImage(loanPlansCache[planId].planImage);
+    }
+    
+    // Fallback to application data
     if (appAny.planImage) return normalizeImage(appAny.planImage);
     if (appAny.productImage) return normalizeImage(appAny.productImage);
     if (appAny.imageUrl) return normalizeImage(appAny.imageUrl);
@@ -382,7 +490,46 @@ export default function DashboardScreen() {
   if (loading && !dashboardData) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <DashboardSkeletonNew />
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerTitle}>Dashboard</Text>
+              <Text style={styles.headerSubtitle}>Loading...</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.tabsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsContainer}
+            contentContainerStyle={styles.tabsContent}
+          >
+            {['installments', 'properties', 'loans', 'insurance'].map((category, index) => (
+              <View key={category} style={[styles.tab, { opacity: 0.5 }]}>
+                <SkeletonLoader width={80} height={40} borderRadius={20} />
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.gridContainer}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={styles.gridCardSkeleton}>
+                <SkeletonLoader width="100%" height={100} borderRadius={0} />
+                <View style={styles.skeletonContent}>
+                  <SkeletonLoader width="80%" height={14} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+                  <SkeletonLoader width="60%" height={12} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+                  <SkeletonLoader width="70%" height={12} borderRadius={4} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -463,6 +610,14 @@ export default function DashboardScreen() {
             
             {/* Details Section */}
             <View style={styles.cardDetails}>
+              {details.totalAmount && (
+                <View style={styles.detailItem}>
+                  <Ionicons name="pricetag-outline" size={14} color={colors.accent} />
+                  <Text style={[styles.detailText, styles.priceText]}>
+                    PKR {details.totalAmount.toLocaleString()}
+                  </Text>
+                </View>
+              )}
               {details.monthlyPayment && (
                 <View style={styles.detailItem}>
                   <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
@@ -622,8 +777,15 @@ export default function DashboardScreen() {
       );
     } else if (selectedCategory === 'loans') {
       const loanApp = app as LoanApplication;
+      const planId = (loanApp as any).planId;
+      
+      // Fetch loan plan if we have planId and haven't cached it yet
+      if (planId && !loanPlansCache[planId]) {
+        fetchLoanPlan(planId);
+      }
+      
       const loanName = getLoanProductName(loanApp);
-      const bankName = (loanApp as any).bankName || '';
+      const bankName = (loanApp as any).bankName || loanPlansCache[planId]?.bankName || '';
       const loanImageUrl = getLoanProductImage(loanApp);
       const statusColor = getStatusColor(loanApp.status);
       
@@ -956,13 +1118,34 @@ export default function DashboardScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={{ opacity: fadeAnim }}>
-          {applications.length === 0 ? (
-            renderEmptyState()
-          ) : (
-            applications.map((app, index) => renderApplicationCard(app, index))
-          )}
-        </Animated.View>
+        {loading ? (
+          <View style={styles.gridContainer}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <View key={index} style={styles.gridCardSkeleton}>
+                <SkeletonLoader width="100%" height={100} borderRadius={0} />
+                <View style={styles.skeletonContent}>
+                  <SkeletonLoader width="80%" height={14} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+                  <SkeletonLoader width="60%" height={12} borderRadius={4} style={{ marginBottom: spacing.xs }} />
+                  <SkeletonLoader width="70%" height={12} borderRadius={4} />
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            {applications.length === 0 ? (
+              renderEmptyState()
+            ) : (
+              <View style={styles.gridContainer}>
+                {applications.map((app, index) => (
+                  <View key={app._id || app.applicationId || index} style={styles.gridItem}>
+                    {renderApplicationCard(app, index)}
+                  </View>
+                ))}
+              </View>
+            )}
+          </Animated.View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1081,20 +1264,44 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: 80, // Space for floating nav bar
   },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  gridItem: {
+    width: (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2,
+  },
   applicationCard: {
     backgroundColor: colors.white,
     borderRadius: 12,
-    marginBottom: spacing.sm,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 0,
+  },
+  gridCardSkeleton: {
+    width: (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom: spacing.sm,
+  },
+  skeletonContent: {
+    padding: spacing.sm,
   },
   cardImage: {
     width: '100%',
-    height: 120,
+    height: 100,
   },
   cardImagePlaceholder: {
     backgroundColor: colors.gray50,
@@ -1103,6 +1310,7 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     padding: spacing.sm,
+    minHeight: 140,
   },
   cardHeader: {
     marginBottom: spacing.sm,
@@ -1114,11 +1322,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 2,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   cardTitleWrapper: {
     flex: 1,
@@ -1143,8 +1351,8 @@ const styles = StyleSheet.create({
   },
   cardDetails: {
     marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    gap: 4,
+    marginBottom: spacing.xs,
+    gap: 3,
   },
   detailItem: {
     flexDirection: 'row',
@@ -1152,9 +1360,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailText: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     flex: 1,
+  },
+  priceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.accent,
   },
   cardFooter: {
     paddingTop: spacing.xs,
@@ -1168,7 +1381,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardMetaText: {
-    fontSize: 10,
+    fontSize: 9,
     color: colors.textTertiary,
   },
   viewDetailsButton: {

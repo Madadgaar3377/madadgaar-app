@@ -80,6 +80,7 @@ export interface ProductSpecifications {
 export interface Installment {
   id?: string;
   _id?: string;
+  installmentPlanId?: string; // Backend field name
   title?: string;
   description?: string;
   amount?: number;
@@ -121,22 +122,97 @@ export interface GetAllInstallmentsResponse {
 
 /**
  * Get single installment by ID
- * GET /getInstallmentById/:id
+ * GET /getInstallment/:id
  */
 export const getInstallmentById = async (id: string): Promise<Installment | null> => {
   try {
-    // We assume normalizing the list response is safer/easier if no dedicated single endpoint exists, 
-    // OR if the single endpoint format matches the list item format.
-    // Let's try to find it in the list first via a fresh API call to ensure we have it.
-    const all = await getAllInstallments();
-    const found = all.find(i => i.id === id || i._id === id);
-    if (found) return found;
+    // Try direct API call first
+    const response = await api.get<any>(`/getInstallment/${id}`, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
 
-    // If not found in list, and assuming maybe pagination logic (future proofing), 
-    // we can try a direct fetch if endpoint existed. For now, rely on list.
-    return null;
+    if (response.data?.success && response.data?.data) {
+      const item = response.data.data;
+      const plan = item.paymentPlans && item.paymentPlans.length > 0 ? item.paymentPlans[0] : {};
+
+      // Image handling
+      let rawImage = '';
+      if (item.productImages && item.productImages.length > 0) {
+        rawImage = item.productImages[0];
+      } else if (item.imageUrl) {
+        rawImage = item.imageUrl;
+      } else if (item.image) {
+        rawImage = item.image;
+      }
+
+      const BASE_IMAGE_URL = 'https://api.madadgaar.com.pk/';
+      if (rawImage && !rawImage.startsWith('http') && !rawImage.startsWith('data:')) {
+        rawImage = rawImage.replace(/^[\/\\]/, '');
+        rawImage = `${BASE_IMAGE_URL}${rawImage}`;
+      }
+
+      const allImages = (item.productImages || []).map((img: string) => {
+        if (img && !img.startsWith('http') && !img.startsWith('data:')) {
+          return `${BASE_IMAGE_URL}${img.replace(/^[\/\\]/, '')}`;
+        }
+        return img;
+      });
+
+      if (allImages.length === 0 && rawImage) {
+        allImages.push(rawImage);
+      }
+
+      const specs: ProductSpecifications = {
+        generalFeatures: item.generalFeatures,
+        performance: item.performance,
+        display: item.display,
+        memory: item.memory,
+        battery: item.battery,
+        camera: item.camera,
+        connectivity: item.connectivity,
+        electricalBike: item.electricalBike,
+        mechanicalBike: item.mechanicalBike,
+        airConditioner: item.airConditioner,
+      };
+
+      return {
+        id: item.installmentPlanId || item._id || item.id || String(Math.random()),
+        _id: item._id,
+        installmentPlanId: item.installmentPlanId, // Keep original field
+        title: item.productName || item.title || 'Installment Product',
+        description: item.description || '',
+        imageUrl: rawImage,
+        productImages: allImages,
+        totalAmount: item.price || 0,
+        downPayment: item.downpayment || plan.downPayment || 0,
+        monthlyPayment: plan.monthlyInstallment || 0,
+        duration: plan.tenureMonths || 0,
+        interestRate: plan.interestRatePercent || 0,
+        city: item.city || '',
+        category: item.category || '',
+        status: item.status || 'active',
+        paymentPlans: item.paymentPlans || [],
+        specifications: specs,
+        createdBy: (item.createdBy && item.createdBy.length > 0) ? item.createdBy[0] : null,
+        originalItem: item
+      };
+    }
+
+    // Fallback to list search if direct call fails
+    const all = await getAllInstallments();
+    const found = all.find(i => i.id === id || i._id === id || i.installmentPlanId === id);
+    return found || null;
   } catch (error) {
-    return null;
+    // Fallback to list search on error
+    try {
+      const all = await getAllInstallments();
+      const found = all.find(i => i.id === id || i._id === id || i.installmentPlanId === id);
+      return found || null;
+    } catch (fallbackError) {
+      return null;
+    }
   }
 }
 

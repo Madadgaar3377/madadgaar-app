@@ -5,7 +5,7 @@ import { DetailPageSkeleton } from '@/components/common/SkeletonLoader';
 import { LazyImage } from '@/components/common/LazyImage';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getLoanById, LoanPlan } from '@/services/loan.api';
+import { getLoanById, getAllLoans, LoanPlan } from '@/services/loan.api';
 import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 
@@ -17,6 +17,7 @@ export default function LoanDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loan, setLoan] = useState<LoanPlan | null>(null);
+  const [relatedLoans, setRelatedLoans] = useState<LoanPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +30,11 @@ export default function LoanDetailScreen() {
       setLoading(true);
       const data = await getLoanById(planId as string);
       setLoan(data);
+      
+      // Load related loans
+      if (data) {
+        loadRelatedLoans(data);
+      }
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -39,6 +45,27 @@ export default function LoanDetailScreen() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRelatedLoans = async (currentLoan: LoanPlan) => {
+    try {
+      const response = await getAllLoans();
+      if (response.success && response.data) {
+        // Filter related loans: same category, same bank, or same financing type
+        const related = response.data
+          .filter((loan) => 
+            loan.planId !== currentLoan.planId && (
+              loan.majorCategory === currentLoan.majorCategory ||
+              loan.bankName === currentLoan.bankName ||
+              loan.financingType === currentLoan.financingType
+            )
+          )
+          .slice(0, 10); // Limit to 10 related loans
+        setRelatedLoans(related);
+      }
+    } catch (error) {
+      console.error('Failed to load related loans:', error);
     }
   };
 
@@ -93,7 +120,7 @@ export default function LoanDetailScreen() {
   return (
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 80 }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header with Back Button */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
@@ -237,6 +264,77 @@ export default function LoanDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.descriptionText}>{loan.description}</Text>
+          </View>
+        )}
+
+        {/* Related Loans */}
+        {relatedLoans.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Related Loan Plans</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.relatedLoansContainer}
+            >
+              {relatedLoans.map((relatedLoan) => (
+                <TouchableOpacity
+                  key={relatedLoan.planId}
+                  style={styles.relatedLoanCard}
+                  onPress={() => {
+                    router.push(`/loan-details/${relatedLoan.planId}` as any);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  {relatedLoan.planImage ? (
+                    <LazyImage
+                      source={{ uri: relatedLoan.planImage }}
+                      style={styles.relatedLoanImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.relatedLoanImage, styles.relatedLoanPlaceholder]}>
+                      <Ionicons name="business-outline" size={32} color="#ccc" />
+                    </View>
+                  )}
+                  <View style={styles.relatedLoanContent}>
+                    <Text style={styles.relatedLoanBank} numberOfLines={1}>
+                      {relatedLoan.bankName}
+                    </Text>
+                    <Text style={styles.relatedLoanTitle} numberOfLines={2}>
+                      {relatedLoan.productName}
+                    </Text>
+                    {relatedLoan.majorCategory && (
+                      <View style={styles.relatedLoanCategory}>
+                        <Ionicons name="pricetag-outline" size={12} color="#666" />
+                        <Text style={styles.relatedLoanCategoryText} numberOfLines={1}>
+                          {relatedLoan.majorCategory}
+                        </Text>
+                      </View>
+                    )}
+                    {(relatedLoan.minFinancingAmount !== undefined || relatedLoan.maxFinancingAmount !== undefined) && (
+                      <View style={styles.relatedLoanAmount}>
+                        <Ionicons name="cash-outline" size={14} color={RED_PRIMARY} />
+                        <Text style={styles.relatedLoanAmountText} numberOfLines={1}>
+                          {relatedLoan.minFinancingAmount !== undefined && relatedLoan.maxFinancingAmount !== undefined
+                            ? `${formatAmount(relatedLoan.minFinancingAmount)} - ${formatAmount(relatedLoan.maxFinancingAmount)}`
+                            : relatedLoan.minFinancingAmount !== undefined
+                            ? `From ${formatAmount(relatedLoan.minFinancingAmount)}`
+                            : relatedLoan.maxFinancingAmount !== undefined
+                            ? `Up to ${formatAmount(relatedLoan.maxFinancingAmount)}`
+                            : 'N/A'}
+                        </Text>
+                      </View>
+                    )}
+                    {relatedLoan.financingType === 'Islamic' && (
+                      <View style={styles.relatedLoanIslamicBadge}>
+                        <Ionicons name="star" size={10} color={RED_PRIMARY} />
+                        <Text style={styles.relatedLoanIslamicText}>Islamic</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -500,6 +598,87 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  relatedLoansContainer: {
+    paddingRight: 20,
+  },
+  relatedLoanCard: {
+    width: 280,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginRight: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  relatedLoanImage: {
+    width: '100%',
+    height: 160,
+    backgroundColor: '#F9F9F9',
+  },
+  relatedLoanPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  relatedLoanContent: {
+    padding: 12,
+  },
+  relatedLoanBank: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: RED_PRIMARY,
+    marginBottom: 4,
+  },
+  relatedLoanTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    minHeight: 40,
+  },
+  relatedLoanCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 4,
+  },
+  relatedLoanCategoryText: {
+    fontSize: 11,
+    color: '#666',
+    flex: 1,
+  },
+  relatedLoanAmount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  relatedLoanAmountText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+  },
+  relatedLoanIslamicBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: RED_LIGHT,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 4,
+  },
+  relatedLoanIslamicText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: RED_PRIMARY,
   },
 });
 

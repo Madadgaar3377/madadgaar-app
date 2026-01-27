@@ -157,13 +157,20 @@ export const getLoanById = async (planId: string): Promise<LoanPlan | null> => {
  */
 export const applyLoan = async (payload: ApplyLoanPayload): Promise<ApplyLoanResponse> => {
   try {
+    console.log('Sending loan application:', payload);
     const response = await api.post<ApplyLoanResponse>('/applyLoan', payload, {
       headers: {
         'Content-Type': 'application/json',
       },
     });
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || response.data.error || 'Failed to apply for loan');
+    }
+    
     return response.data;
   } catch (error: any) {
+    console.error('Loan application API error:', error);
     const errorResponse: ApplyLoanResponse = {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to apply for loan',

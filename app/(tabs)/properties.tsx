@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated, TextInput, Modal } from 'react-native';
-import { PropertyCardSkeleton } from '@/components/common/SkeletonLoader';
+import { PropertyGridSkeleton } from '@/components/common/SkeletonLoader';
 import { LazyImage } from '@/components/common/LazyImage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -222,7 +222,7 @@ export default function PropertiesScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <PropertyCardSkeleton count={6} />
+            <PropertyGridSkeleton count={6} />
           </ScrollView>
         ) : (
           <ScrollView
@@ -245,7 +245,7 @@ export default function PropertiesScreen() {
                 )}
               </View>
             ) : (
-              <Animated.View style={{ opacity: fadeAnim }}>
+              <Animated.View style={[styles.gridContainer, { opacity: fadeAnim }]}>
                 {filteredProperties.map((property) => (
                   <TouchableOpacity
                     key={property._id || property.id || Math.random()}
@@ -253,175 +253,110 @@ export default function PropertiesScreen() {
                     onPress={() => handlePropertyPress(property)}
                     activeOpacity={0.9}
                   >
-                    {/* Image Section */}
-                    <View style={styles.imageSection}>
-                      {property.imageUrl || (property.images && property.images.length > 0) ? (
-                        <LazyImage
-                          source={{ uri: property.imageUrl || property.images?.[0] }}
-                          style={styles.cardImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={styles.placeholderImage}>
-                          <Ionicons name="home-outline" size={48} color="#ccc" />
-                        </View>
-                      )}
-                      {property.purpose && (
-                        <View style={styles.purposeBadge}>
-                          <Text style={styles.purposeBadgeText}>{property.purpose}</Text>
-                        </View>
-                      )}
-                      {property.images && property.images.length > 1 && (
-                        <View style={styles.imageCountBadge}>
-                          <Ionicons name="images" size={14} color="#fff" />
-                          <Text style={styles.imageCountText}>{property.images.length}</Text>
-                        </View>
-                      )}
-                    </View>
+                    <View style={styles.cardInner}>
+                      {/* Image Section */}
+                      <View style={styles.imageWrapper}>
+                        {property.imageUrl || (property.images && property.images.length > 0) ? (
+                          <LazyImage
+                            source={{ uri: property.imageUrl || property.images?.[0] }}
+                            style={styles.cardImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={styles.placeholderImage}>
+                            <Ionicons name="home-outline" size={32} color="#ccc" />
+                          </View>
+                        )}
+                        {property.purpose && (
+                          <View style={styles.purposeBadge}>
+                            <Text style={styles.purposeBadgeText}>{property.purpose}</Text>
+                          </View>
+                        )}
+                        {property.images && property.images.length > 1 && (
+                          <View style={styles.imageCountBadge}>
+                            <Ionicons name="images" size={12} color="#fff" />
+                            <Text style={styles.imageCountText}>{property.images.length}</Text>
+                          </View>
+                        )}
+                      </View>
 
-                    {/* Content Section */}
-                    <View style={styles.cardContent}>
-                      {/* Title and Type */}
-                      <View style={styles.titleRow}>
-                        <View style={styles.titleContainer}>
+                      {/* Content Section */}
+                      <View style={styles.cardInfo}>
+                        <View>
                           <Text style={styles.cardTitle} numberOfLines={2}>
                             {getPropertyTitle(property)}
                           </Text>
-                          {property.type && (
-                            <View style={styles.typeBadge}>
-                              <Ionicons name="home" size={12} color={RED_PRIMARY} />
-                              <Text style={styles.typeText}>{property.type}</Text>
+                          {getPropertyLocation(property) && (
+                            <View style={styles.locationRow}>
+                              <Ionicons name="location-outline" size={12} color="#999" />
+                              <Text style={styles.cardLocation} numberOfLines={1}>
+                                {getPropertyLocation(property)}
+                              </Text>
                             </View>
                           )}
                         </View>
-                      </View>
 
-                      {/* Location */}
-                      {getPropertyLocation(property) && (
-                        <View style={styles.locationRow}>
-                          <Ionicons name="location" size={14} color="#999" />
-                          <Text style={styles.cardLocation} numberOfLines={1}>
-                            {getPropertyLocation(property)}
-                          </Text>
+                        {/* Price */}
+                        <View style={styles.priceContainer}>
+                          <View style={styles.priceRow}>
+                            <Text style={styles.priceLabel}>
+                              {(() => {
+                                const transaction = getPropertyTransaction(property);
+                                if (transaction?.type === 'Rent') return 'Rent';
+                                return 'Price';
+                              })()}
+                            </Text>
+                            <Text style={styles.priceValue}>
+                              PKR {(() => {
+                                const transaction = getPropertyTransaction(property);
+                                if (transaction?.type === 'Rent') {
+                                  return getPropertyMonthlyRent(property)?.toLocaleString() || 'N/A';
+                                }
+                                return getPropertyPrice(property)?.toLocaleString() || 'N/A';
+                              })()}
+                            </Text>
+                          </View>
+                          {(() => {
+                            const transaction = getPropertyTransaction(property);
+                            if (transaction?.type === 'Installment' && getPropertyMonthlyRent(property)) {
+                              return (
+                                <View style={styles.cashPriceRow}>
+                                  <Text style={styles.cashPriceLabel}>Monthly:</Text>
+                                  <Text style={styles.cashPriceValue}>
+                                    PKR {getPropertyMonthlyRent(property)?.toLocaleString()}/mo
+                                  </Text>
+                                </View>
+                              );
+                            }
+                            return null;
+                          })()}
                         </View>
-                      )}
 
-                      {/* Price */}
-                      <View style={styles.priceSection}>
-                        <View>
-                          <Text style={styles.priceLabel}>
-                            {(() => {
-                              const transaction = getPropertyTransaction(property);
-                              if (transaction?.type === 'Rent') return 'Monthly Rent';
-                              if (transaction?.type === 'Installment') return 'Price';
-                              return 'Price';
-                            })()}
-                          </Text>
-                          <Text style={styles.priceValue}>
-                            PKR {(() => {
-                              const transaction = getPropertyTransaction(property);
-                              if (transaction?.type === 'Rent') {
-                                return getPropertyMonthlyRent(property)?.toLocaleString() || 'N/A';
-                              }
-                              return getPropertyPrice(property)?.toLocaleString() || 'N/A';
-                            })()}
-                          </Text>
-                        </View>
-                        {(() => {
-                          const transaction = getPropertyTransaction(property);
-                          if (transaction?.type === 'Installment' && getPropertyMonthlyRent(property)) {
-                            return (
-                              <View style={styles.installmentBadge}>
-                                <Ionicons name="card" size={12} color={RED_PRIMARY} />
-                                <Text style={styles.installmentBadgeText}>
-                                  PKR {getPropertyMonthlyRent(property)?.toLocaleString()}/mo
-                                </Text>
-                              </View>
-                            );
-                          }
-                          if (transaction?.type) {
-                            return (
-                              <View style={styles.typeTransactionBadge}>
-                                <Text style={styles.typeTransactionText}>
-                                  {transaction.type}
-                                </Text>
-                              </View>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </View>
-
-                      {/* Property Details Grid */}
-                      <View style={styles.detailsGrid}>
-                        {getPropertyAreaSize(property) && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="resize" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{getPropertyAreaSize(property)}</Text>
-                          </View>
-                        )}
-                        {getPropertyBedrooms(property) && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="bed" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{getPropertyBedrooms(property)} Beds</Text>
-                          </View>
-                        )}
-                        {getPropertyBathrooms(property) && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="water" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{getPropertyBathrooms(property)} Baths</Text>
-                          </View>
-                        )}
-                        {property.floors && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="layers" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{property.floors} Floors</Text>
-                          </View>
-                        )}
-                        {property.furnished && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="cube" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{property.furnished}</Text>
-                          </View>
-                        )}
-                        {property.builtInYear && (
-                          <View style={styles.detailItem}>
-                            <Ionicons name="calendar" size={16} color="#666" />
-                            <Text style={styles.detailItemText}>{property.builtInYear}</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Additional Info */}
-                      {(property.readyForPossession || property.noOfInstallment) && (
-                        <View style={styles.additionalInfo}>
-                          {property.readyForPossession && (
-                            <View style={styles.infoChip}>
-                              <Ionicons 
-                                name={property.readyForPossession === 'Yes' ? "checkmark-circle" : "time"} 
-                                size={14} 
-                                color={property.readyForPossession === 'Yes' ? "#4CAF50" : "#FF9800"} 
-                              />
-                              <Text style={styles.infoChipText}>{property.readyForPossession}</Text>
+                        {/* Property Details */}
+                        <View style={styles.detailsRow}>
+                          {getPropertyAreaSize(property) && (
+                            <View style={styles.detailBadge}>
+                              <Ionicons name="resize" size={12} color={RED_PRIMARY} />
+                              <Text style={styles.detailText}>{getPropertyAreaSize(property)}</Text>
                             </View>
                           )}
-                          {property.noOfInstallment && (
-                            <View style={styles.infoChip}>
-                              <Ionicons name="card" size={14} color={RED_PRIMARY} />
-                              <Text style={styles.infoChipText}>{property.noOfInstallment} Installments</Text>
+                          {getPropertyBedrooms(property) && (
+                            <View style={styles.detailBadge}>
+                              <Ionicons name="bed" size={12} color={RED_PRIMARY} />
+                              <Text style={styles.detailText}>{getPropertyBedrooms(property)}</Text>
                             </View>
                           )}
                         </View>
-                      )}
 
-                      {/* View Button */}
-                      <TouchableOpacity 
-                        style={styles.viewButton} 
-                        onPress={() => handlePropertyPress(property)}
-                      >
-                        <Text style={styles.viewButtonText}>View Details</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#fff" />
-                      </TouchableOpacity>
+                        {/* View Button */}
+                        <TouchableOpacity 
+                          style={styles.viewBtn} 
+                          onPress={() => handlePropertyPress(property)}
+                        >
+                          <Text style={styles.viewBtnText}>View</Text>
+                          <Ionicons name="arrow-forward" size={12} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -670,6 +605,12 @@ const styles = StyleSheet.create({
   },
   scrollView: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 80 },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   emptyContainer: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -692,19 +633,26 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    width: '48%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
     overflow: 'hidden',
+    marginBottom: 0,
   },
-  imageSection: {
-    height: 220,
-    position: 'relative',
+  cardInner: {
+    flexDirection: 'column',
+  },
+  imageWrapper: {
+    width: '100%',
+    height: 160,
     backgroundColor: '#F9F9F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   cardImage: {
     width: '100%',
@@ -719,175 +667,127 @@ const styles = StyleSheet.create({
   },
   purposeBadge: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   purposeBadgeText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
   },
   imageCountBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   imageCountText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
-  cardContent: {
-    padding: 16,
-  },
-  titleRow: {
-    marginBottom: 8,
-  },
-  titleContainer: {
-    flexDirection: 'row',
+  cardInfo: {
+    padding: 12,
+    minHeight: 140,
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    flex: 1,
-    marginRight: 8,
-  },
-  typeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  typeText: {
-    fontSize: 11,
-    color: RED_PRIMARY,
+    fontSize: 14,
     fontWeight: '600',
+    color: '#333',
+    lineHeight: 18,
+    marginBottom: 4,
+    minHeight: 36,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 6,
-  },
-  cardLocation: {
-    fontSize: 13,
-    color: '#666',
-    flex: 1,
-  },
-  priceSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 2,
-  },
-  priceValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: RED_PRIMARY,
-  },
-  installmentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    marginBottom: 6,
     gap: 4,
   },
-  installmentBadgeText: {
-    fontSize: 12,
-    color: RED_PRIMARY,
-    fontWeight: '600',
-  },
-  typeTransactionBadge: {
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  typeTransactionText: {
+  cardLocation: {
     fontSize: 11,
+    color: '#999',
+    flex: 1,
+  },
+  priceContainer: {
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginBottom: 4,
+  },
+  priceLabel: {
+    fontSize: 10,
+    color: '#888',
+  },
+  priceValue: {
+    fontSize: 16,
     fontWeight: '700',
     color: RED_PRIMARY,
-    textTransform: 'uppercase',
   },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 12,
-  },
-  detailItem: {
+  cashPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  cashPriceLabel: {
+    fontSize: 10,
+    color: '#888',
+  },
+  cashPriceValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  detailsRow: {
+    flexDirection: 'row',
     gap: 6,
-    minWidth: '30%',
-  },
-  detailItemText: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  additionalInfo: {
-    flexDirection: 'row',
+    marginBottom: 8,
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
   },
-  infoChip: {
+  detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 8,
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 6,
     gap: 4,
   },
-  infoChipText: {
+  detailText: {
     fontSize: 11,
-    color: '#666',
-    fontWeight: '500',
+    color: RED_PRIMARY,
+    fontWeight: '600',
   },
-  viewButton: {
+  viewBtn: {
     backgroundColor: RED_PRIMARY,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
+    gap: 3,
     marginTop: 4,
   },
-  viewButtonText: {
+  viewBtnText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
   },
   // Modal Styles
   modalOverlay: {

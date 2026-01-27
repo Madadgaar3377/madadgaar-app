@@ -30,21 +30,63 @@ export interface Property {
       sewage?: boolean;
     };
     amenities?: {
+      // Infrastructure & Utilities
+      undergroundElectricity?: boolean;
+      waterSupply?: boolean;
+      sewerageSystem?: boolean;
+      drainageSystem?: boolean;
+      backupPower?: boolean;
+      // Religious & Community
+      mosque?: boolean;
+      communityCenter?: boolean;
+      // Education, Health & Commercial
+      school?: boolean;
+      medicalFacility?: boolean;
+      commercialZone?: boolean;
+      // Recreational & Outdoor
+      parks?: boolean;
+      playground?: boolean;
+      garden?: boolean;
+      swimmingPool?: boolean;
+      clubhouse?: boolean;
+      joggingTrack?: boolean;
+      sportsCourts?: boolean;
+      waterFeatures?: boolean;
+      petPark?: boolean;
+      // Residential Interior
+      servantQuarters?: boolean;
+      drawingRoom?: boolean;
+      diningRoom?: boolean;
+      studyRoom?: boolean;
+      prayerRoom?: boolean;
+      lounge?: boolean;
+      storeRoom?: boolean;
+      laundryRoom?: boolean;
+      gym?: boolean;
+      steamRoom?: boolean;
+      // Building & Property Features
+      parking?: boolean;
+      balcony?: boolean;
+      terrace?: boolean;
+      elevator?: boolean;
+      receptionArea?: boolean;
+      meetingRoom?: boolean;
+      publicTransportAccess?: boolean;
+      commonAreaWifi?: boolean;
+      // Security & Building Systems
       security?: boolean;
       cctv?: boolean;
       fireSafety?: boolean;
-      parks?: boolean;
-      playground?: boolean;
-      clubhouse?: boolean;
-      gym?: boolean;
-      swimmingPool?: boolean;
-      mosque?: boolean;
-      school?: boolean;
-      medical?: boolean;
-      parking?: boolean;
+      airConditioning?: boolean;
+      // Commercial / Miscellaneous
+      brandingSpace?: boolean;
+      retailShops?: boolean;
+      loadingUnloadingArea?: boolean;
+      cafeteria?: boolean;
+      laundryService?: boolean;
+      // Utilities (Extended)
       evCharging?: boolean;
       wasteManagement?: boolean;
-      elevator?: boolean;
     };
     description?: string;
     highlights?: string[];
@@ -57,6 +99,7 @@ export interface Property {
     transaction?: {
       type?: string;
       price?: number;
+      priceRange?: string;
       advanceAmount?: number;
       monthlyRent?: number;
       contractDuration?: string;
@@ -102,17 +145,69 @@ export interface Property {
       internet?: boolean;
     };
     amenities?: {
+      // Infrastructure & Utilities
+      undergroundElectricity?: boolean;
+      waterSupply?: boolean;
+      sewerageSystem?: boolean;
+      drainageSystem?: boolean;
+      backupPower?: boolean;
+      // Religious & Community
+      mosque?: boolean;
+      communityCenter?: boolean;
+      // Education, Health & Commercial
+      school?: boolean;
+      medicalFacility?: boolean;
+      commercialZone?: boolean;
+      // Recreational & Outdoor
+      parks?: boolean;
+      playground?: boolean;
+      garden?: boolean;
+      swimmingPool?: boolean;
+      clubhouse?: boolean;
+      joggingTrack?: boolean;
+      sportsCourts?: boolean;
+      waterFeatures?: boolean;
+      petPark?: boolean;
+      // Residential Interior
+      servantQuarters?: boolean;
+      drawingRoom?: boolean;
+      diningRoom?: boolean;
+      studyRoom?: boolean;
+      prayerRoom?: boolean;
+      lounge?: boolean;
+      storeRoom?: boolean;
+      laundryRoom?: boolean;
+      gym?: boolean;
+      steamRoom?: boolean;
+      // Building & Property Features
+      parking?: boolean;
+      balcony?: boolean;
+      terrace?: boolean;
+      elevator?: boolean;
+      receptionArea?: boolean;
+      meetingRoom?: boolean;
+      publicTransportAccess?: boolean;
+      commonAreaWifi?: boolean;
+      // Security & Building Systems
       security?: boolean;
       cctv?: boolean;
-      gym?: boolean;
-      swimmingPool?: boolean;
-      parking?: boolean;
-      elevator?: boolean;
+      fireSafety?: boolean;
+      airConditioning?: boolean;
+      // Commercial / Miscellaneous
+      brandingSpace?: boolean;
+      retailShops?: boolean;
+      loadingUnloadingArea?: boolean;
+      cafeteria?: boolean;
+      laundryService?: boolean;
+      // Utilities (Extended)
+      evCharging?: boolean;
+      wasteManagement?: boolean;
     };
     nearbyLandmarks?: string;
     transaction?: {
       type?: string;
       price?: number;
+      priceRange?: string;
       advanceAmount?: number;
       monthlyRent?: number;
       contractDuration?: string;
@@ -406,6 +501,13 @@ export const getPropertyPrice = (property: Property): number | null => {
   return property.price || null;
 };
 
+export const getPropertyPriceRange = (property: Property): string | null => {
+  if (property.type === 'Project' && property.project?.transaction?.priceRange) {
+    return property.project.transaction.priceRange;
+  }
+  return null;
+};
+
 export const getPropertyMonthlyRent = (property: Property): number | null => {
   if (property.type === 'Project' && property.project?.transaction) {
     return property.project.transaction.monthlyRent || 
@@ -491,21 +593,63 @@ export const getPropertyUtilities = (property: Property): {
 };
 
 export const getPropertyAmenities = (property: Property): {
+  // Infrastructure & Utilities
+  undergroundElectricity?: boolean;
+  waterSupply?: boolean;
+  sewerageSystem?: boolean;
+  drainageSystem?: boolean;
+  backupPower?: boolean;
+  // Religious & Community
+  mosque?: boolean;
+  communityCenter?: boolean;
+  // Education, Health & Commercial
+  school?: boolean;
+  medicalFacility?: boolean;
+  commercialZone?: boolean;
+  // Recreational & Outdoor
+  parks?: boolean;
+  playground?: boolean;
+  garden?: boolean;
+  swimmingPool?: boolean;
+  clubhouse?: boolean;
+  joggingTrack?: boolean;
+  sportsCourts?: boolean;
+  waterFeatures?: boolean;
+  petPark?: boolean;
+  // Residential Interior
+  servantQuarters?: boolean;
+  drawingRoom?: boolean;
+  diningRoom?: boolean;
+  studyRoom?: boolean;
+  prayerRoom?: boolean;
+  lounge?: boolean;
+  storeRoom?: boolean;
+  laundryRoom?: boolean;
+  gym?: boolean;
+  steamRoom?: boolean;
+  // Building & Property Features
+  parking?: boolean;
+  balcony?: boolean;
+  terrace?: boolean;
+  elevator?: boolean;
+  receptionArea?: boolean;
+  meetingRoom?: boolean;
+  publicTransportAccess?: boolean;
+  commonAreaWifi?: boolean;
+  // Security & Building Systems
   security?: boolean;
   cctv?: boolean;
   fireSafety?: boolean;
-  parks?: boolean;
-  playground?: boolean;
-  clubhouse?: boolean;
-  gym?: boolean;
-  swimmingPool?: boolean;
-  mosque?: boolean;
-  school?: boolean;
-  medical?: boolean;
-  parking?: boolean;
+  airConditioning?: boolean;
+  // Commercial / Miscellaneous
+  brandingSpace?: boolean;
+  retailShops?: boolean;
+  loadingUnloadingArea?: boolean;
+  cafeteria?: boolean;
+  laundryService?: boolean;
+  // Utilities (Extended)
   evCharging?: boolean;
   wasteManagement?: boolean;
-  elevator?: boolean;
 } | null => {
   if (property.type === 'Project' && property.project?.amenities) {
     return property.project.amenities;

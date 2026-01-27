@@ -26,6 +26,7 @@ import { useAppSelector } from '@/store/hooks';
 import { colors, spacing } from '@/theme';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { DetailPageSkeleton } from '@/components/common/SkeletonLoader';
+import { PageLoader } from '@/components/common/PageLoader';
 import Toast from 'react-native-toast-message';
 
 const RED_PRIMARY = '#D32F2F';
@@ -161,17 +162,30 @@ export default function ApplyPropertyScreen() {
     }
 
     // Get property type and propertyId from schema
-    const propertyType = property.type || 'Individual'; // Default to Individual if type is not set
+    const propertyType = property.type;
+    
+    if (!propertyType || (propertyType !== 'Project' && propertyType !== 'Individual')) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Invalid property type',
+        position: 'top',
+        visibilityTime: 2500,
+      });
+      return;
+    }
+
     const propertyId = getPropertyId(property);
     
     if (!propertyId) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Property ID is missing',
+        text2: 'Property ID is missing. Please try again or contact support.',
         position: 'top',
         visibilityTime: 2500,
       });
+      console.error('Property ID missing. Property:', property);
       return;
     }
 
@@ -180,14 +194,14 @@ export default function ApplyPropertyScreen() {
 
       // Transform form data to match backend schema
       const commonForm = [{
-        name: formData.name || '',
-        email: formData.email || '',
-        number: formData.phone || '',
-        whatsApp: formData.whatsApp || '',
-        cnic: formData.cnic || '',
-        city: formData.city || '',
-        area: formData.address || '',
-        reference: formData.reference || '',
+        name: formData.name?.trim() || '',
+        email: formData.email?.trim() || '',
+        number: formData.phone?.trim() || '',
+        whatsApp: formData.whatsApp?.trim() || '',
+        cnic: formData.cnic?.trim() || '',
+        city: formData.city?.trim() || '',
+        area: formData.address?.trim() || '',
+        reference: formData.reference?.trim() || '',
       }];
 
       const payload = {
@@ -199,29 +213,33 @@ export default function ApplyPropertyScreen() {
         },
       };
 
+      console.log('Submitting property application:', { type: propertyType, propertyId });
+
       const response = await applyProperty(payload);
 
       if (response.success) {
         Toast.show({
           type: 'success',
           text1: 'Application Submitted',
-          text2: 'Your property application has been submitted successfully. We will review it and get back to you soon.',
+          text2: response.message || 'Your property application has been submitted successfully. We will review it and get back to you soon.',
           position: 'top',
-          visibilityTime: 2500,
+          visibilityTime: 3000,
           onHide: () => {
             router.back();
           },
         });
       } else {
-        throw new Error(response.message || 'Failed to submit application');
+        throw new Error(response.message || response.error || 'Failed to submit application');
       }
     } catch (error: any) {
+      console.error('Property application error:', error);
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to submit application. Please try again.';
       Toast.show({
         type: 'error',
         text1: 'Submission Failed',
-        text2: error.message || 'Failed to submit application. Please try again.',
+        text2: errorMessage,
         position: 'top',
-        visibilityTime: 2500,
+        visibilityTime: 3000,
       });
     } finally {
       setSubmitting(false);
@@ -248,6 +266,7 @@ export default function ApplyPropertyScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      {submitting && <PageLoader fullScreen message="Submitting application..." />}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

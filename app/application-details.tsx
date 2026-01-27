@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,13 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { InstallmentApplication, PropertyApplication, LoanApplication, getUserDashboard } from '@/services/dashboard.api';
 import { useAppSelector } from '@/store/hooks';
-import { colors } from '@/theme';
+import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { DetailPageSkeleton } from '@/components/common/SkeletonLoader';
 import { getPropertyTitle, getPropertyLocation, getPropertyPrice, getPropertyMonthlyRent, getPropertyImages } from '@/services/property.api';
+import { getInstallmentById, Installment } from '@/services/installment.api';
+import { LazyImage } from '@/components/common/LazyImage';
 
 const RED_PRIMARY = '#D32F2F';
 
@@ -25,12 +27,41 @@ export default function ApplicationDetailsScreen() {
   const { isAuthenticated, loading: authLoading } = useAppSelector((state) => state.auth);
   const [application, setApplication] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [installmentPlan, setInstallmentPlan] = useState<Installment | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+
+  const loadInstallmentPlan = useCallback(async (installmentPlanId: string) => {
+    // Only try to fetch if we have a valid installmentPlanId
+    // Skip if it looks like a MongoDB ObjectId (24 hex chars) as backend prefers installmentPlanId
+    if (!installmentPlanId || /^[0-9a-fA-F]{24}$/.test(installmentPlanId)) {
+      return;
+    }
+
+    try {
+      setLoadingPlan(true);
+      const plan = await getInstallmentById(installmentPlanId);
+      if (plan) {
+        setInstallmentPlan(plan);
+      }
+    } catch (error: any) {
+      console.error('Failed to load installment plan:', error);
+      // Silently fail - we'll use PlanInfo data instead
+    } finally {
+      setLoadingPlan(false);
+    }
+  }, []);
   
   // Try to parse data if provided, otherwise fetch by applicationId
   useEffect(() => {
     if (data) {
       try {
-        setApplication(JSON.parse(data as string));
+        const parsedApp = JSON.parse(data as string);
+        setApplication(parsedApp);
+        
+        // Fetch full installment plan details if it's an installment application
+        if (type === 'installment' && parsedApp.installmentPlanId) {
+          loadInstallmentPlan(parsedApp.installmentPlanId);
+        }
       } catch (e) {
         // If parsing fails, fetch by applicationId
         if (applicationId) {
@@ -40,7 +71,7 @@ export default function ApplicationDetailsScreen() {
     } else if (applicationId) {
       loadApplication();
     }
-  }, [applicationId, data]);
+  }, [applicationId, data, type, loadInstallmentPlan]);
 
   const loadApplication = async () => {
     if (!applicationId || !type) return;
@@ -68,6 +99,11 @@ export default function ApplicationDetailsScreen() {
         
         if (foundApp) {
           setApplication(foundApp);
+          
+          // Fetch full installment plan details if it's an installment application
+          if (type === 'installment' && foundApp.installmentPlanId) {
+            loadInstallmentPlan(foundApp.installmentPlanId);
+          }
         } else {
           Toast.show({
             type: 'error',
@@ -159,7 +195,20 @@ export default function ApplicationDetailsScreen() {
     }
   };
 
-  const renderInstallmentDetails = (app: InstallmentApplication) => (
+  const renderInstallmentDetails = (app: InstallmentApplication) => {
+    const planInfo = app.PlanInfo && app.PlanInfo.length > 0 ? app.PlanInfo[0] : null;
+    const appAny = app as any;
+    const selectedPlanIndex = appAny.selectedPlanIndex !== undefined ? appAny.selectedPlanIndex : 0;
+    const productName = installmentPlan?.title || planInfo?.planType || 'Installment Plan';
+    const productImages = installmentPlan?.productImages || [];
+    const mainImage = productImages.length > 0 ? productImages[0] : installmentPlan?.imageUrl || null;
+    
+    // Get the selected plan that was applied for
+    const selectedPlan = installmentPlan?.paymentPlans && installmentPlan.paymentPlans[selectedPlanIndex] 
+      ? installmentPlan.paymentPlans[selectedPlanIndex] 
+      : null;
+    
+    return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
       {/* Header */}
       <View style={styles.header}>
@@ -182,6 +231,171 @@ export default function ApplicationDetailsScreen() {
         </Text>
         <Text style={styles.dateText}>Applied on: {formatDate(app.createdAt)}</Text>
       </View>
+
+      {/* Product Image */}
+      {mainImage && (
+        <View style={styles.section}>
+          <View style={styles.imageContainer}>
+            <LazyImage
+              source={{ uri: mainImage }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Product Information */}
+      {installmentPlan && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Information</Text>
+          <View style={styles.infoCard}>
+            {installmentPlan.title && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{installmentPlan.title}</Text>
+              </View>
+            )}
+            {installmentPlan.description && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Description</Text>
+                <Text style={styles.infoValue}>{installmentPlan.description}</Text>
+              </View>
+            )}
+            {installmentPlan.category && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Category</Text>
+                <Text style={styles.infoValue}>{installmentPlan.category}</Text>
+              </View>
+            )}
+            {installmentPlan.city && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>City</Text>
+                <Text style={styles.infoValue}>{installmentPlan.city}</Text>
+              </View>
+            )}
+            {installmentPlan.totalAmount && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Cash Price</Text>
+                <Text style={[styles.infoValue, styles.priceValue]}>
+                  PKR {installmentPlan.totalAmount.toLocaleString()}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Selected Payment Plan - The plan you applied for */}
+      {(selectedPlan || planInfo) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Selected Payment Plan</Text>
+          <View style={[styles.planCard, styles.selectedPlanCard]}>
+            <View style={styles.planHeader}>
+              <View style={styles.planHeaderLeft}>
+                <Text style={styles.planName}>
+                  {selectedPlan?.planName || planInfo?.planType || `Plan ${selectedPlanIndex + 1}`}
+                </Text>
+                <View style={styles.selectedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color={RED_PRIMARY} />
+                  <Text style={styles.selectedBadgeText}>Selected</Text>
+                </View>
+              </View>
+              {(selectedPlan?.installmentPrice || planInfo?.planPrice) && (
+                <Text style={styles.planPrice}>
+                  PKR {(selectedPlan?.installmentPrice || planInfo?.planPrice || 0).toLocaleString()}
+                </Text>
+              )}
+            </View>
+            <View style={styles.planDetails}>
+              {(selectedPlan?.monthlyInstallment || planInfo?.monthlyInstallment) && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Monthly Installment:</Text>
+                  <Text style={[styles.planDetailValue, styles.planDetailValueBold]}>
+                    PKR {(selectedPlan?.monthlyInstallment || planInfo?.monthlyInstallment || 0).toLocaleString()}
+                  </Text>
+                </View>
+              )}
+              {(selectedPlan?.downPayment || planInfo?.downPayment) && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="cash-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Down Payment:</Text>
+                  <Text style={styles.planDetailValue}>
+                    PKR {(selectedPlan?.downPayment || planInfo?.downPayment || 0).toLocaleString()}
+                  </Text>
+                </View>
+              )}
+              {(selectedPlan?.tenureMonths || planInfo?.tenureMonths) && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Tenure:</Text>
+                  <Text style={styles.planDetailValue}>
+                    {(selectedPlan?.tenureMonths || planInfo?.tenureMonths || 0)} Months
+                  </Text>
+                </View>
+              )}
+              {(selectedPlan?.interestRatePercent !== undefined || planInfo?.interestRatePercent !== undefined) && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="trending-up-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Interest Rate:</Text>
+                  <Text style={styles.planDetailValue}>
+                    {(selectedPlan?.interestRatePercent || planInfo?.interestRatePercent || 0)}% 
+                    {selectedPlan?.interestType || planInfo?.interestType ? ` ${selectedPlan?.interestType || planInfo?.interestType}` : ''}
+                  </Text>
+                </View>
+              )}
+              {selectedPlan?.totalPayable && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="calculator-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Total Payable:</Text>
+                  <Text style={[styles.planDetailValue, styles.planDetailValueBold]}>
+                    PKR {selectedPlan.totalPayable.toLocaleString()}
+                  </Text>
+                </View>
+              )}
+              {selectedPlan?.totalMarkup && (
+                <View style={styles.planDetailRow}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                  <Text style={styles.planDetailLabel}>Total Markup:</Text>
+                  <Text style={styles.planDetailValue}>
+                    PKR {selectedPlan.totalMarkup.toLocaleString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Specifications */}
+      {installmentPlan?.specifications && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Specifications</Text>
+          <View style={styles.infoCard}>
+            {Object.entries(installmentPlan.specifications).map(([category, specs]: [string, any]) => {
+              if (!specs || typeof specs !== 'object') return null;
+              return (
+                <View key={category} style={styles.specCategory}>
+                  <Text style={styles.specCategoryTitle}>
+                    {category.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                  </Text>
+                  {Object.entries(specs).map(([key, value]: [string, any]) => (
+                    value && (
+                      <View key={key} style={styles.infoRow}>
+                        <Text style={styles.infoLabel}>
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                        </Text>
+                        <Text style={styles.infoValue}>{String(value)}</Text>
+                      </View>
+                    )
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {/* Plan Information */}
       {app.PlanInfo && app.PlanInfo.length > 0 && (
@@ -371,7 +585,8 @@ export default function ApplicationDetailsScreen() {
         </View>
       </View>
     </ScrollView>
-  );
+    );
+  };
 
   const renderPropertyDetails = (app: PropertyApplication) => {
     const appAny = app as any;
@@ -916,6 +1131,113 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: RED_PRIMARY,
     fontWeight: '600',
+  },
+  imageContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  productImage: {
+    width: '100%',
+    height: 250,
+  },
+  priceValue: {
+    color: RED_PRIMARY,
+    fontWeight: '700',
+  },
+  planCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  planName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    flex: 1,
+  },
+  planPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: RED_PRIMARY,
+  },
+  planDetails: {
+    gap: 8,
+  },
+  planDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  planDetailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  planDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  specCategory: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  specCategoryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
+  selectedPlanCard: {
+    borderWidth: 2,
+    borderColor: RED_PRIMARY,
+    backgroundColor: '#FFF5F5',
+  },
+  planHeaderLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  selectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  selectedBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: RED_PRIMARY,
+  },
+  planDetailValueBold: {
+    fontWeight: '700',
+    color: RED_PRIMARY,
+    fontSize: 15,
   },
 });
 

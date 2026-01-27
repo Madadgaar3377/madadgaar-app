@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getInstallmentById, getAllInstallments, Installment } from '@/services/installment.api';
 import { colors, spacing } from '@/theme';
+import { InstallmentReviews } from '@/components/reviews/InstallmentReviews';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +19,8 @@ export default function ProductDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [sameCategoryProducts, setSameCategoryProducts] = useState<Installment[]>([]);
+    const [expandedPlanIndex, setExpandedPlanIndex] = useState<number | null>(null);
+    const [expandedSpecGroup, setExpandedSpecGroup] = useState<string | null>(null);
     const imageScrollRef = useRef<ScrollView>(null);
     const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isUserScrollingRef = useRef(false);
@@ -32,12 +35,28 @@ export default function ProductDetailScreen() {
         };
     }, [id]);
 
+    // Helper to find best plan index (lowest monthly installment)
+    const findBestPlanIndex = (paymentPlans: any[]): number => {
+        if (!paymentPlans || paymentPlans.length === 0) return 0;
+        return paymentPlans.reduce((bestIdx, current, currentIdx) => {
+            const currentMonthly = Number(current.monthlyInstallment || 0);
+            const bestMonthly = Number(paymentPlans[bestIdx].monthlyInstallment || 0);
+            return currentMonthly > 0 && (bestMonthly === 0 || currentMonthly < bestMonthly) ? currentIdx : bestIdx;
+        }, 0);
+    };
+
     const loadProduct = async () => {
         if (!id) return;
         try {
             setLoading(true);
             const data = await getInstallmentById(id as string);
             setProduct(data);
+            
+            // Set best plan as expanded by default
+            if (data?.paymentPlans && data.paymentPlans.length > 0) {
+                const bestIndex = findBestPlanIndex(data.paymentPlans);
+                setExpandedPlanIndex(bestIndex);
+            }
             
             // Load same category products
             if (data?.category) {
@@ -250,8 +269,16 @@ export default function ProductDetailScreen() {
                 <View style={styles.section}>
                     <Text style={styles.title}>{product.title}</Text>
                     <View style={styles.priceRow}>
-                        <Text style={styles.mainPriceLabel}>Monthly starts from</Text>
-                        <Text style={styles.mainPrice}>PKR {product.monthlyPayment?.toLocaleString()}</Text>
+                        <View style={styles.priceRowTop}>
+                            <Text style={styles.mainPriceLabel}>Monthly starts from</Text>
+                            <Text style={styles.mainPrice}>PKR {product.monthlyPayment?.toLocaleString()}</Text>
+                        </View>
+                        <View style={styles.cashPriceRow}>
+                            <Text style={styles.cashPriceLabel}>Cash Price:</Text>
+                            <Text style={styles.cashPriceValue}>
+                                PKR {(product.totalAmount || (product as any).originalItem?.price || (product as any).price || 0).toLocaleString()}
+                            </Text>
+                        </View>
                     </View>
                     {product.city ? (
                         <View style={styles.locationRow}>
@@ -261,165 +288,541 @@ export default function ProductDetailScreen() {
                     ) : null}
                 </View>
 
-                {/* Payment Plans */}
+                {/* Basic Information */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Payment Plans</Text>
+                    <Text style={styles.sectionTitle}>Basic Information</Text>
+                    <View style={styles.basicInfoGrid}>
+                        <View style={styles.basicInfoCard}>
+                            <Text style={styles.basicInfoLabel}>Product Name</Text>
+                            <Text style={styles.basicInfoValue}>{product.title || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.basicInfoCard}>
+                            <Text style={styles.basicInfoLabel}>Company</Text>
+                            <Text style={styles.basicInfoValue}>
+                                {(product as any).originalItem?.companyName || 
+                                 (product as any).originalItem?.companyNameOther ||
+                                 (product as any).companyName ||
+                                 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={styles.basicInfoCard}>
+                            <Text style={styles.basicInfoLabel}>Category</Text>
+                            <Text style={styles.basicInfoValue}>
+                                {product.category ? product.category.charAt(0).toUpperCase() + product.category.slice(1).replace(/_/g, ' ') : 'N/A'}
+                            </Text>
+                        </View>
+                        <View style={styles.basicInfoCard}>
+                            <Text style={styles.basicInfoLabel}>City</Text>
+                            <Text style={styles.basicInfoValue}>{product.city || 'N/A'}</Text>
+                        </View>
+                        <View style={[styles.basicInfoCard, styles.basicInfoCardHighlight]}>
+                            <Text style={styles.basicInfoLabel}>Base Price</Text>
+                            <Text style={styles.basicInfoValueHighlight}>
+                                PKR {(product.totalAmount || (product as any).originalItem?.price || (product as any).price || 0).toLocaleString()}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Payment Plans - Dropdown Style - 2 Column Grid */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Payment Plans ({product.paymentPlans?.length || 0})</Text>
                     {product.paymentPlans && product.paymentPlans.length > 0 ? (
-                        product.paymentPlans.map((plan, index) => (
-                            <View key={index} style={styles.planCard}>
-                                <View style={styles.planHeader}>
-                                    <Text style={styles.planName}>{plan.planName || `Plan ${index + 1}`}</Text>
-                                    <Text style={styles.planDuration}>{plan.tenureMonths} Months</Text>
+                        <View style={styles.plansGridContainer}>
+                            {product.paymentPlans.map((plan: any, index: number) => {
+                            const basePrice = product.totalAmount || (product as any).originalItem?.price || (product as any).price || 0;
+                            const financedAmount = Math.max(0, basePrice - (plan.downPayment || 0));
+                            const totalPayable = Number(plan.installmentPrice || plan.monthlyInstallment * (plan.tenureMonths || 1) || 0);
+                            const totalMarkup = Number(plan.markup || 0);
+                            const totalCost = basePrice + totalMarkup;
+                            const bestPlanIndex = findBestPlanIndex(product.paymentPlans || []);
+                            const isBestPlan = index === bestPlanIndex;
+                            const isOpen = expandedPlanIndex === index;
+
+                            return (
+                                <View 
+                                    key={index} 
+                                    style={[
+                                        styles.planCardDropdown,
+                                        isBestPlan && styles.planCardBest,
+                                        isOpen && styles.planCardOpen
+                                    ]}
+                                >
+                                    {/* Plan Header - Clickable */}
+                                    <TouchableOpacity
+                                        style={styles.planHeaderDropdown}
+                                        onPress={() => setExpandedPlanIndex(isOpen ? null : index)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.planHeaderContent}>
+                                            <View style={styles.planHeaderLeft}>
+                                                <View style={styles.planNameRow}>
+                                                    <Text style={styles.planNameDropdown}>
+                                                        {plan.planName || `Plan ${index + 1}`}
+                                                    </Text>
+                                                    {isBestPlan && (
+                                                        <View style={styles.bestPlanBadge}>
+                                                            <Text style={styles.bestPlanText}>⭐ BEST</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <View style={styles.planSummaryRow}>
+                                                    <Text style={styles.planMonthlyPrice}>
+                                                        PKR {(plan.monthlyInstallment || 0).toLocaleString()}
+                                                    </Text>
+                                                    <Text style={styles.planMonthlyLabel}>/month</Text>
+                                                    <Text style={styles.planTenureBadge}>
+                                                        {plan.tenureMonths || plan.tenure || 0} Months
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.planCashPriceRow}>
+                                                    <Text style={styles.planCashPriceLabel}>Cash Price:</Text>
+                                                    <Text style={styles.planCashPriceValue}>
+                                                        PKR {basePrice.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Ionicons
+                                                name={isOpen ? "chevron-up" : "chevron-down"}
+                                                size={24}
+                                                color="#666"
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    {/* Plan Details - Expandable */}
+                                    {isOpen && (
+                                        <View style={styles.planDetailsExpanded}>
+                                            {/* Financial Grid */}
+                                            <View style={styles.financialGrid}>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Down Payment</Text>
+                                                    <Text style={styles.financialGridValue}>
+                                                        PKR {(plan.downPayment || 0).toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Financed Amount</Text>
+                                                    <Text style={styles.financialGridValue}>
+                                                        PKR {financedAmount.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Interest Rate</Text>
+                                                    <Text style={styles.financialGridValue}>
+                                                        {plan.interestRatePercent || plan.interestRate || 0}%
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Interest Type</Text>
+                                                    <Text style={styles.financialGridValue} numberOfLines={1}>
+                                                        {plan.interestType || "—"}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Total Payable</Text>
+                                                    <Text style={styles.financialGridValue}>
+                                                        PKR {totalPayable.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.financialGridItem}>
+                                                    <Text style={styles.financialGridLabel}>Total Markup</Text>
+                                                    <Text style={styles.financialGridValue}>
+                                                        PKR {totalMarkup.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                                <View style={[styles.financialGridItem, styles.financialGridItemHighlight]}>
+                                                    <Text style={styles.financialGridLabel}>Total Cost</Text>
+                                                    <Text style={styles.financialGridValueHighlight}>
+                                                        PKR {totalCost.toLocaleString()}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Finance Information */}
+                                            {plan.finance && (plan.finance.bankName || plan.finance.financeInfo) && (
+                                                <View style={styles.financeCard}>
+                                                    <View style={styles.financeHeader}>
+                                                        <Ionicons name="business-outline" size={18} color={colors.accent} />
+                                                        <Text style={styles.financeTitle}>Finance Information</Text>
+                                                    </View>
+                                                    {plan.finance.bankName && (
+                                                        <View style={styles.financeItem}>
+                                                            <Text style={styles.financeLabel}>Bank:</Text>
+                                                            <Text style={styles.financeValue}>{plan.finance.bankName}</Text>
+                                                        </View>
+                                                    )}
+                                                    {plan.finance.financeInfo && (
+                                                        <View style={styles.financeItem}>
+                                                            <Text style={styles.financeLabel}>Details:</Text>
+                                                            <Text style={styles.financeDetails}>{plan.finance.financeInfo}</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            )}
+
+                                            {/* Other Charges */}
+                                            {plan.otherChargesNote && (
+                                                <View style={styles.otherChargesCard}>
+                                                    <Text style={styles.otherChargesLabel}>Other Charges</Text>
+                                                    <Text style={styles.otherChargesValue}>{plan.otherChargesNote}</Text>
+                                                </View>
+                                            )}
+
+                                            {/* Apply Button */}
+                                            <TouchableOpacity
+                                                style={styles.applyPlanButton}
+                                                onPress={() => {
+                                                    router.push({
+                                                        pathname: '/apply-installment',
+                                                        params: {
+                                                            id: product.id,
+                                                            planIndex: String(index)
+                                                        }
+                                                    } as any);
+                                                }}
+                                            >
+                                                <Text style={styles.applyPlanButtonText}>Apply for This Plan</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                 </View>
-                                <View style={styles.planDetails}>
-                                    <View style={styles.planDetailItem}>
-                                        <Text style={styles.planDetailLabel}>Down Payment</Text>
-                                        <Text style={styles.planDetailValue}>PKR {plan.downPayment?.toLocaleString()}</Text>
-                                    </View>
-                                    <View style={styles.verticalDivider} />
-                                    <View style={styles.planDetailItem}>
-                                        <Text style={styles.planDetailLabel}>Monthly</Text>
-                                        <Text style={styles.planDetailValue}>PKR {plan.monthlyInstallment?.toLocaleString()}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        ))
+                            );
+                            })}
+                        </View>
                     ) : (
                         <Text style={styles.emptyText}>No specific plans available.</Text>
                     )}
                 </View>
 
-                {/* Specifications - Category-based display */}
+                {/* Specifications - Category-based display with Dropdowns */}
                 {specs && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Specifications</Text>
-
-                        {/* Mobile/Phone Specifications */}
-                        {(specs.generalFeatures || specs.display || specs.memory || specs.battery || specs.camera || specs.connectivity) && (
+                        <View style={styles.specsHeader}>
+                            <Text style={styles.sectionTitle}>Product Specifications</Text>
+                            {(product as any).originalItem?.productSpecifications?.category && (
+                                <Text style={styles.specsCategory}>
+                                    ({(product as any).originalItem.productSpecifications.category})
+                                </Text>
+                            )}
+                        </View>
+                        {(product as any).originalItem?.productSpecifications?.subCategory && (
+                            <Text style={styles.specsSubCategory}>
+                                {(product as any).originalItem.productSpecifications.subCategory}
+                            </Text>
+                        )}
+                        
+                        {/* Check if productSpecifications exists (from backend) */}
+                        {(product as any).originalItem?.productSpecifications?.specifications && 
+                         Array.isArray((product as any).originalItem.productSpecifications.specifications) &&
+                         (product as any).originalItem.productSpecifications.specifications.length > 0 ? (
+                            <View style={styles.specsGridContainer}>
+                                <View style={styles.specsGrid}>
+                                    {(product as any).originalItem.productSpecifications.specifications
+                                        .filter((spec: any) => spec.value && spec.value !== 'N/A' && spec.value !== '')
+                                        .map((spec: any, idx: number) => (
+                                        <View key={idx} style={styles.specCard}>
+                                            <Text style={styles.specCardLabel}>{spec.field || "—"}</Text>
+                                            <Text style={styles.specCardValue}>{spec.value || "—"}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        ) : (
                             <>
-                                {hasValidSpecs(specs.generalFeatures) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>General Features</Text>
-                                        {renderSpecRow('Model', specs.generalFeatures?.model)}
-                                        {renderSpecRow('Operating System', specs.generalFeatures?.operatingSystem)}
-                                        {renderSpecRow('SIM Support', specs.generalFeatures?.simSupport)}
-                                        {renderSpecRow('Colors', specs.generalFeatures?.colors)}
-                                        {renderSpecRow('Dimensions', specs.generalFeatures?.phoneDimensions || specs.generalFeatures?.dimensions)}
-                                        {renderSpecRow('Weight', specs.generalFeatures?.phoneWeight || specs.generalFeatures?.weight)}
+                                {/* Mobile/Phone Specifications */}
+                                {(specs.generalFeatures || specs.display || specs.memory || specs.battery || specs.camera || specs.connectivity) && (
+                                    <>
+                                        {hasValidSpecs(specs.generalFeatures) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'generalFeatures' ? null : 'generalFeatures')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>General Features</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'generalFeatures' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'generalFeatures' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Model', specs.generalFeatures?.model)}
+                                                        {renderSpecRow('Operating System', specs.generalFeatures?.operatingSystem)}
+                                                        {renderSpecRow('SIM Support', specs.generalFeatures?.simSupport)}
+                                                        {renderSpecRow('Colors', specs.generalFeatures?.colors)}
+                                                        {renderSpecRow('Dimensions', specs.generalFeatures?.phoneDimensions || specs.generalFeatures?.dimensions)}
+                                                        {renderSpecRow('Weight', specs.generalFeatures?.phoneWeight || specs.generalFeatures?.weight)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.display) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'display' ? null : 'display')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Display</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'display' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'display' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Screen Size', specs.display?.screenSize)}
+                                                        {renderSpecRow('Resolution', specs.display?.screenResolution)}
+                                                        {renderSpecRow('Technology', specs.display?.technology)}
+                                                        {renderSpecRow('Protection', specs.display?.protection)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.performance) && !specs.mechanicalBike && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'performance' ? null : 'performance')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Performance</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'performance' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'performance' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Processor', specs.performance?.processor)}
+                                                        {renderSpecRow('GPU', specs.performance?.gpu)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.memory) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'memory' ? null : 'memory')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Memory</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'memory' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'memory' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('RAM', specs.memory?.ram)}
+                                                        {renderSpecRow('Internal Storage', specs.memory?.internalMemory)}
+                                                        {renderSpecRow('Card Slot', specs.memory?.cardSlot)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.camera) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'camera' ? null : 'camera')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Camera</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'camera' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'camera' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Front Camera', specs.camera?.frontCamera)}
+                                                        {renderSpecRow('Back Camera', specs.camera?.backCamera)}
+                                                        {renderSpecRow('Features', specs.camera?.features)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.battery) && !specs.electricalBike && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'battery' ? null : 'battery')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Battery</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'battery' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'battery' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Type', specs.battery?.type)}
+                                                        {renderSpecRow('Capacity', specs.battery?.capacity)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.connectivity) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'connectivity' ? null : 'connectivity')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Connectivity</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'connectivity' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'connectivity' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Data', specs.connectivity?.data)}
+                                                        {renderSpecRow('Bluetooth', specs.connectivity?.bluetooth)}
+                                                        {renderSpecRow('NFC', specs.connectivity?.nfc)}
+                                                        {renderSpecRow('Infrared', specs.connectivity?.infrared)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* Electrical Bike Specifications */}
+                                {hasValidSpecs(specs.electricalBike) && (
+                                    <View style={styles.specGroupDropdown}>
+                                        <TouchableOpacity
+                                            style={styles.specGroupHeader}
+                                            onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'electricalBike' ? null : 'electricalBike')}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={styles.specGroupTitle}>E-Bike Specifications</Text>
+                                            <Ionicons
+                                                name={expandedSpecGroup === 'electricalBike' ? "chevron-up" : "chevron-down"}
+                                                size={20}
+                                                color="#666"
+                                            />
+                                        </TouchableOpacity>
+                                        {expandedSpecGroup === 'electricalBike' && (
+                                            <View style={styles.specGroupContent}>
+                                                {renderSpecRow('Model', specs.electricalBike?.model)}
+                                                {renderSpecRow('Top Speed', specs.electricalBike?.speed)}
+                                                {renderSpecRow('Range', specs.electricalBike?.rangeKm)}
+                                                {renderSpecRow('Battery', specs.electricalBike?.batterySpec)}
+                                                {renderSpecRow('Charging Time', specs.electricalBike?.chargingTime)}
+                                                {renderSpecRow('Motor', specs.electricalBike?.motor)}
+                                                {renderSpecRow('Brakes', specs.electricalBike?.brakes)}
+                                                {renderSpecRow('Weight', specs.electricalBike?.weight)}
+                                                {renderSpecRow('Dimensions', specs.electricalBike?.dimensions)}
+                                                {renderSpecRow('Warranty', specs.electricalBike?.warranty)}
+                                            </View>
+                                        )}
                                     </View>
                                 )}
 
-                                {hasValidSpecs(specs.display) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Display</Text>
-                                        {renderSpecRow('Screen Size', specs.display?.screenSize)}
-                                        {renderSpecRow('Resolution', specs.display?.screenResolution)}
-                                        {renderSpecRow('Technology', specs.display?.technology)}
-                                        {renderSpecRow('Protection', specs.display?.protection)}
-                                    </View>
+                                {/* Mechanical Bike Specifications */}
+                                {specs.mechanicalBike && (
+                                    <>
+                                        {hasValidSpecs(specs.mechanicalBike.generalFeatures) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'mechanicalBike-general' ? null : 'mechanicalBike-general')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>General Features</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'mechanicalBike-general' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'mechanicalBike-general' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Engine', specs.mechanicalBike.generalFeatures?.engine)}
+                                                        {renderSpecRow('Model', specs.mechanicalBike.generalFeatures?.model)}
+                                                        {renderSpecRow('Dimensions', specs.mechanicalBike.generalFeatures?.dimensions)}
+                                                        {renderSpecRow('Weight', specs.mechanicalBike.generalFeatures?.weight)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {hasValidSpecs(specs.mechanicalBike.performance) && (
+                                            <View style={styles.specGroupDropdown}>
+                                                <TouchableOpacity
+                                                    style={styles.specGroupHeader}
+                                                    onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'mechanicalBike-performance' ? null : 'mechanicalBike-performance')}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text style={styles.specGroupTitle}>Performance</Text>
+                                                    <Ionicons
+                                                        name={expandedSpecGroup === 'mechanicalBike-performance' ? "chevron-up" : "chevron-down"}
+                                                        size={20}
+                                                        color="#666"
+                                                    />
+                                                </TouchableOpacity>
+                                                {expandedSpecGroup === 'mechanicalBike-performance' && (
+                                                    <View style={styles.specGroupContent}>
+                                                        {renderSpecRow('Transmission', specs.mechanicalBike.performance?.transmission)}
+                                                        {renderSpecRow('Starting', specs.mechanicalBike.performance?.starting)}
+                                                        {renderSpecRow('Displacement', specs.mechanicalBike.performance?.displacement)}
+                                                        {renderSpecRow('Ground Clearance', specs.mechanicalBike.performance?.groundClearance)}
+                                                        {renderSpecRow('Petrol Capacity', specs.mechanicalBike.performance?.petrolCapacity)}
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+                                    </>
                                 )}
 
-                                {hasValidSpecs(specs.performance) && !specs.mechanicalBike && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Performance</Text>
-                                        {renderSpecRow('Processor', specs.performance?.processor)}
-                                        {renderSpecRow('GPU', specs.performance?.gpu)}
-                                    </View>
-                                )}
-
-                                {hasValidSpecs(specs.memory) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Memory</Text>
-                                        {renderSpecRow('RAM', specs.memory?.ram)}
-                                        {renderSpecRow('Internal Storage', specs.memory?.internalMemory)}
-                                        {renderSpecRow('Card Slot', specs.memory?.cardSlot)}
-                                    </View>
-                                )}
-
-                                {hasValidSpecs(specs.camera) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Camera</Text>
-                                        {renderSpecRow('Front Camera', specs.camera?.frontCamera)}
-                                        {renderSpecRow('Back Camera', specs.camera?.backCamera)}
-                                        {renderSpecRow('Features', specs.camera?.features)}
-                                    </View>
-                                )}
-
-                                {hasValidSpecs(specs.battery) && !specs.electricalBike && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Battery</Text>
-                                        {renderSpecRow('Type', specs.battery?.type)}
-                                        {renderSpecRow('Capacity', specs.battery?.capacity)}
-                                    </View>
-                                )}
-
-                                {hasValidSpecs(specs.connectivity) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Connectivity</Text>
-                                        {renderSpecRow('Data', specs.connectivity?.data)}
-                                        {renderSpecRow('Bluetooth', specs.connectivity?.bluetooth)}
-                                        {renderSpecRow('NFC', specs.connectivity?.nfc)}
-                                        {renderSpecRow('Infrared', specs.connectivity?.infrared)}
+                                {/* Air Conditioner Specifications */}
+                                {hasValidSpecs(specs.airConditioner) && (
+                                    <View style={styles.specGroupDropdown}>
+                                        <TouchableOpacity
+                                            style={styles.specGroupHeader}
+                                            onPress={() => setExpandedSpecGroup(expandedSpecGroup === 'airConditioner' ? null : 'airConditioner')}
+                                            activeOpacity={0.7}
+                                        >
+                                            <Text style={styles.specGroupTitle}>Air Conditioner Specifications</Text>
+                                            <Ionicons
+                                                name={expandedSpecGroup === 'airConditioner' ? "chevron-up" : "chevron-down"}
+                                                size={20}
+                                                color="#666"
+                                            />
+                                        </TouchableOpacity>
+                                        {expandedSpecGroup === 'airConditioner' && (
+                                            <View style={styles.specGroupContent}>
+                                                {Object.entries(specs.airConditioner).map(([key, value]) => {
+                                                    if (value && typeof value === 'string' && value !== 'N/A' && value !== '') {
+                                                        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                                                        return renderSpecRow(label, value);
+                                                    }
+                                                    return null;
+                                                })}
+                                            </View>
+                                        )}
                                     </View>
                                 )}
                             </>
-                        )}
-
-                        {/* Electrical Bike Specifications */}
-                        {hasValidSpecs(specs.electricalBike) && (
-                            <View style={styles.specGroup}>
-                                <Text style={styles.specGroupTitle}>E-Bike Specifications</Text>
-                                {renderSpecRow('Model', specs.electricalBike?.model)}
-                                {renderSpecRow('Top Speed', specs.electricalBike?.speed)}
-                                {renderSpecRow('Range', specs.electricalBike?.rangeKm)}
-                                {renderSpecRow('Battery', specs.electricalBike?.batterySpec)}
-                                {renderSpecRow('Charging Time', specs.electricalBike?.chargingTime)}
-                                {renderSpecRow('Motor', specs.electricalBike?.motor)}
-                                {renderSpecRow('Brakes', specs.electricalBike?.brakes)}
-                                {renderSpecRow('Weight', specs.electricalBike?.weight)}
-                                {renderSpecRow('Dimensions', specs.electricalBike?.dimensions)}
-                                {renderSpecRow('Warranty', specs.electricalBike?.warranty)}
-                            </View>
-                        )}
-
-                        {/* Mechanical Bike Specifications */}
-                        {specs.mechanicalBike && (
-                            <>
-                                {hasValidSpecs(specs.mechanicalBike.generalFeatures) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>General Features</Text>
-                                        {renderSpecRow('Engine', specs.mechanicalBike.generalFeatures?.engine)}
-                                        {renderSpecRow('Model', specs.mechanicalBike.generalFeatures?.model)}
-                                        {renderSpecRow('Dimensions', specs.mechanicalBike.generalFeatures?.dimensions)}
-                                        {renderSpecRow('Weight', specs.mechanicalBike.generalFeatures?.weight)}
-                                    </View>
-                                )}
-
-                                {hasValidSpecs(specs.mechanicalBike.performance) && (
-                                    <View style={styles.specGroup}>
-                                        <Text style={styles.specGroupTitle}>Performance</Text>
-                                        {renderSpecRow('Transmission', specs.mechanicalBike.performance?.transmission)}
-                                        {renderSpecRow('Starting', specs.mechanicalBike.performance?.starting)}
-                                        {renderSpecRow('Displacement', specs.mechanicalBike.performance?.displacement)}
-                                        {renderSpecRow('Ground Clearance', specs.mechanicalBike.performance?.groundClearance)}
-                                        {renderSpecRow('Petrol Capacity', specs.mechanicalBike.performance?.petrolCapacity)}
-                                    </View>
-                                )}
-                            </>
-                        )}
-
-                        {/* Air Conditioner Specifications */}
-                        {hasValidSpecs(specs.airConditioner) && (
-                            <View style={styles.specGroup}>
-                                <Text style={styles.specGroupTitle}>Air Conditioner Specifications</Text>
-                                {Object.entries(specs.airConditioner).map(([key, value]) => {
-                                    if (value && typeof value === 'string' && value !== 'N/A' && value !== '') {
-                                        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                                        return renderSpecRow(label, value);
-                                    }
-                                    return null;
-                                })}
-                            </View>
                         )}
                     </View>
                 )}
@@ -431,6 +834,45 @@ export default function ProductDetailScreen() {
                         <Text style={styles.descriptionText}>{product.description}</Text>
                     </View>
                 ) : null}
+
+                {/* Creator Information */}
+                {product.createdBy && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Posted By</Text>
+                        <View style={styles.creatorCard}>
+                            {product.createdBy.name && (
+                                <Text style={styles.creatorName}>{product.createdBy.name}</Text>
+                            )}
+                            {product.createdBy.email && (
+                                <View style={styles.creatorInfoRow}>
+                                    <Ionicons name="mail-outline" size={14} color="#666" />
+                                    <Text style={styles.creatorInfo}>{product.createdBy.email}</Text>
+                                </View>
+                            )}
+                            {product.createdBy.phone && (
+                                <View style={styles.creatorInfoRow}>
+                                    <Ionicons name="call-outline" size={14} color="#666" />
+                                    <Text style={styles.creatorInfo}>{product.createdBy.phone}</Text>
+                                </View>
+                            )}
+                            {product.createdBy.userType && (
+                                <View style={styles.creatorBadge}>
+                                    <Text style={styles.creatorBadgeText}>
+                                        {product.createdBy.userType.charAt(0).toUpperCase() + product.createdBy.userType.slice(1)}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                )}
+
+                {/* Reviews Section */}
+                <View style={styles.section}>
+                    <InstallmentReviews
+                        installmentPlanId={product.installmentPlanId}
+                        planId={product._id}
+                    />
+                </View>
 
                 {/* Same Category Products */}
                 {sameCategoryProducts.length > 0 && (
@@ -593,9 +1035,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     priceRow: {
+        marginBottom: 8,
+    },
+    priceRowTop: {
         flexDirection: 'row',
         alignItems: 'baseline',
-        marginBottom: 8,
+        marginBottom: 6,
         flexWrap: 'wrap',
     },
     mainPriceLabel: {
@@ -607,6 +1052,21 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: colors.accent,
+    },
+    cashPriceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    cashPriceLabel: {
+        fontSize: 13,
+        color: '#666',
+        fontWeight: '500',
+    },
+    cashPriceValue: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#333',
     },
     locationRow: {
         flexDirection: 'row',
@@ -628,6 +1088,160 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         marginBottom: 12,
+    },
+    // Dropdown Plan Card Styles
+    planCardDropdown: {
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        marginBottom: 12,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+    },
+    planCardBest: {
+        borderColor: colors.accent,
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    planCardOpen: {
+        borderColor: colors.accent,
+    },
+    planHeaderDropdown: {
+        padding: 16,
+    },
+    planHeaderContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    planHeaderLeft: {
+        flex: 1,
+        marginRight: 12,
+    },
+    planNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 8,
+        gap: 8,
+    },
+    planNameDropdown: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    bestPlanBadge: {
+        backgroundColor: colors.accent,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    bestPlanText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    planSummaryRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        marginBottom: 6,
+        flexWrap: 'wrap',
+    },
+    planMonthlyPrice: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: colors.accent,
+        marginRight: 4,
+    },
+    planMonthlyLabel: {
+        fontSize: 12,
+        color: '#666',
+        marginRight: 12,
+    },
+    planTenureBadge: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#666',
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    planCashPriceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 6,
+        gap: 6,
+    },
+    planCashPriceLabel: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
+    },
+    planCashPriceValue: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '700',
+    },
+    planDetailsExpanded: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+    },
+    financialGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
+        marginBottom: 12,
+    },
+    financialGridItem: {
+        flex: 1,
+        minWidth: '47%',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 10,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    financialGridItemHighlight: {
+        backgroundColor: '#FFEBEE',
+        borderColor: '#FFCDD2',
+        borderWidth: 2,
+        width: '100%',
+    },
+    financialGridLabel: {
+        fontSize: 10,
+        color: '#666',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    financialGridValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    financialGridValueHighlight: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.accent,
+    },
+    applyPlanButton: {
+        backgroundColor: colors.accent,
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    applyPlanButtonText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '700',
     },
     planHeader: {
         flexDirection: 'row',
@@ -678,14 +1292,63 @@ const styles = StyleSheet.create({
     specGroup: {
         marginBottom: 16,
     },
+    specGroupDropdown: {
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        overflow: 'hidden',
+        backgroundColor: '#FFFFFF',
+    },
+    specGroupHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 14,
+        backgroundColor: '#F5F5F5',
+    },
     specGroupTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    specGroupContent: {
+        padding: 14,
+        paddingTop: 8,
+    },
+    // Specs Grid (for productSpecifications)
+    specsGridContainer: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    specsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    specCard: {
+        flex: 1,
+        minWidth: '47%',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    specCardLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#666',
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    specCardValue: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#555',
-        marginBottom: 8,
-        backgroundColor: '#F5F5F5',
-        padding: 6,
-        borderRadius: 4,
+        color: '#1A1A1A',
     },
     specRow: {
         flexDirection: 'row',
@@ -795,5 +1458,225 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         color: colors.accent,
+    },
+    // Basic Information Styles
+    basicInfoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    basicInfoCard: {
+        flex: 1,
+        minWidth: '45%',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+    },
+    basicInfoCardHighlight: {
+        backgroundColor: '#FFEBEE',
+        borderWidth: 1,
+        borderColor: '#FFCDD2',
+    },
+    basicInfoLabel: {
+        fontSize: 11,
+        color: '#666',
+        fontWeight: '600',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+    basicInfoValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    basicInfoValueHighlight: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.accent,
+    },
+    // Enhanced Plan Styles
+    planDurationBadge: {
+        backgroundColor: '#FFEBEE',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    financialSummary: {
+        marginTop: 12,
+        gap: 8,
+    },
+    financialItem: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 10,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    financialItemHighlight: {
+        backgroundColor: '#FFEBEE',
+        borderColor: '#FFCDD2',
+        borderWidth: 2,
+    },
+    financialItemSuccess: {
+        backgroundColor: '#E8F5E9',
+        borderColor: '#C8E6C9',
+        borderWidth: 2,
+    },
+    financialLabel: {
+        fontSize: 10,
+        color: '#666',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    financialValue: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    financialValueHighlight: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.accent,
+    },
+    financialValueSuccess: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#2E7D32',
+    },
+    planDetailsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 12,
+    },
+    planDetailCard: {
+        flex: 1,
+        minWidth: '30%',
+        backgroundColor: '#FAFAFA',
+        borderRadius: 10,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    planDetailSubtext: {
+        fontSize: 12,
+        fontWeight: '400',
+        color: '#666',
+    },
+    // Finance Information Styles
+    financeCard: {
+        backgroundColor: '#FFF9E6',
+        borderRadius: 12,
+        padding: 14,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#FFE082',
+    },
+    financeHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 10,
+    },
+    financeTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#333',
+    },
+    financeItem: {
+        marginTop: 8,
+    },
+    financeLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 4,
+    },
+    financeValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    financeDetails: {
+        fontSize: 13,
+        color: '#555',
+        lineHeight: 20,
+        marginTop: 4,
+    },
+    // Other Charges Styles
+    otherChargesCard: {
+        backgroundColor: '#FAFAFA',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    otherChargesLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#666',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    otherChargesValue: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#333',
+    },
+    // Creator Information Styles
+    creatorCard: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 16,
+    },
+    creatorName: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginBottom: 8,
+    },
+    creatorInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 6,
+    },
+    creatorInfo: {
+        fontSize: 13,
+        color: '#666',
+    },
+    creatorBadge: {
+        alignSelf: 'flex-start',
+        backgroundColor: '#E3F2FD',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginTop: 8,
+    },
+    creatorBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#1976D2',
+    },
+    specsHeader: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+        marginBottom: 8,
+    },
+    specsCategory: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.accent,
+        marginLeft: 8,
+    },
+    specsSubCategory: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 12,
+        marginLeft: 4,
     },
 });

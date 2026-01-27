@@ -19,6 +19,7 @@ import { AuthHeader } from '@/components/auth/AuthHeader';
 import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { PersonIcon } from '@/components/icons';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const RED_PRIMARY = '#D32F2F';
 const RED_LIGHT = '#FFEBEE';
@@ -83,6 +84,7 @@ export default function ForgotPasswordScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {loading && <PageLoader fullScreen message="Sending verification code..." />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

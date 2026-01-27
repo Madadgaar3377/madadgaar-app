@@ -19,6 +19,7 @@ import { OTPInput } from '@/components/common/OTPInput';
 import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const RED_PRIMARY = '#D32F2F';
 const RED_LIGHT = '#FFEBEE';
@@ -35,6 +36,7 @@ export default function ResetOtpScreen() {
   const [otp, setOtp] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (!email) {
@@ -66,10 +68,15 @@ export default function ResetOtpScreen() {
       return;
     }
 
-    router.push({
-      pathname: '/(auth)/new-password',
-      params: { email, otp },
-    });
+    setVerifying(true);
+    // Small delay to show loader
+    setTimeout(() => {
+      router.push({
+        pathname: '/(auth)/new-password',
+        params: { email, otp },
+      });
+      setVerifying(false);
+    }, 300);
   };
 
   const handleResendOtp = async () => {
@@ -97,6 +104,7 @@ export default function ResetOtpScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {(loading || verifying || resendLoading) && <PageLoader fullScreen message={verifying ? "Verifying code..." : resendLoading ? "Resending code..." : "Processing..."} />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

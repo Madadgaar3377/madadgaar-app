@@ -30,6 +30,7 @@ import { LazyImage } from '@/components/common/LazyImage';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { ProfileSkeleton } from '@/components/common/SkeletonLoader';
 import { BottomSheet } from '@/components/common/BottomSheet';
+import Constants from 'expo-constants';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -343,13 +344,16 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>ACCOUNT</Text>
 
             <View style={styles.menuGroup}>
-              <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => router.push('/personal-information' as any)}
+              >
                 <View style={styles.menuIconContainer}>
                   <Ionicons name="person-outline" size={22} color={colors.accent} />
                 </View>
                 <View style={styles.menuText}>
                   <Text style={styles.menuLabel}>Personal Information</Text>
-                  <Text style={styles.menuDesc}>Update your details</Text>
+                  <Text style={styles.menuDesc}>View and update your details</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
@@ -434,7 +438,9 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+          <Text style={styles.versionText}>
+            Version {Constants.expoConfig?.version || '1.0.1'}
+          </Text>
         </Animated.View>
       </ScrollView>
 

@@ -21,6 +21,7 @@ import { useAppSelector } from '@/store/hooks';
 import { colors, spacing } from '@/theme';
 import { AuthRequired } from '@/components/auth/AuthRequired';
 import { DetailPageSkeleton } from '@/components/common/SkeletonLoader';
+import { PageLoader } from '@/components/common/PageLoader';
 import Toast from 'react-native-toast-message';
 
 const RED_PRIMARY = '#D32F2F';
@@ -293,29 +294,33 @@ export default function ApplyLoanScreen() {
         applicationNote: applicationNote.trim() || undefined,
       };
 
+      console.log('Submitting loan application:', { planId: planId, loanType: loanRequirement.loanType });
+
       const response = await applyLoan(payload);
 
       if (response.success) {
         Toast.show({
           type: 'success',
           text1: 'Application Submitted',
-          text2: 'Your loan application has been submitted successfully. We will review it and get back to you soon.',
+          text2: response.message || 'Your loan application has been submitted successfully. We will review it and get back to you soon.',
           position: 'top',
-          visibilityTime: 2500,
+          visibilityTime: 3000,
           onHide: () => {
             router.back();
           },
         });
       } else {
-        throw new Error(response.message || 'Failed to submit application');
+        throw new Error(response.message || response.error || 'Failed to submit application');
       }
     } catch (error: any) {
+      console.error('Loan application error:', error);
+      const errorMessage = error.message || error.response?.data?.message || 'Failed to submit application. Please try again.';
       Toast.show({
         type: 'error',
         text1: 'Submission Failed',
-        text2: error.message || 'Failed to submit application. Please try again.',
+        text2: errorMessage,
         position: 'top',
-        visibilityTime: 2500,
+        visibilityTime: 3000,
       });
     } finally {
       setSubmitting(false);
@@ -354,6 +359,7 @@ export default function ApplyLoanScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      {submitting && <PageLoader fullScreen message="Submitting application..." />}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

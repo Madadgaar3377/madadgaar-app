@@ -20,6 +20,7 @@ import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { LockIcon } from '@/components/icons';
 import { Ionicons } from '@expo/vector-icons';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const RED_PRIMARY = '#D32F2F';
 const RED_LIGHT = '#FFEBEE';
@@ -115,6 +116,7 @@ export default function NewPasswordScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {loading && <PageLoader fullScreen message="Resetting password..." />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -201,7 +201,7 @@ export default function InstallmentsScreen() {
                 <Text style={styles.emptySubtext}>Try adjusting your filters</Text>
               </View>
             ) : (
-              <Animated.View style={{ opacity: fadeAnim }}>
+              <Animated.View style={[styles.gridContainer, { opacity: fadeAnim }]}>
                 {filteredInstallments.map((installment) => (
                   <TouchableOpacity
                     key={installment.id || Math.random()}
@@ -235,10 +235,17 @@ export default function InstallmentsScreen() {
                           <Text style={styles.cardDesc} numberOfLines={1}>{installment.description || 'No description'}</Text>
                         </View>
 
-
                         <View style={styles.priceContainer}>
-                          <Text style={styles.priceLabel}>Monthly</Text>
-                          <Text style={styles.priceValue}>PKR {(installment.monthlyPayment || 0).toLocaleString()}</Text>
+                          <View style={styles.priceRow}>
+                            <Text style={styles.priceLabel}>Monthly</Text>
+                            <Text style={styles.priceValue}>PKR {(installment.monthlyPayment || 0).toLocaleString()}</Text>
+                          </View>
+                          <View style={styles.cashPriceRow}>
+                            <Text style={styles.cashPriceLabel}>Cash:</Text>
+                            <Text style={styles.cashPriceValue}>
+                              PKR {(installment.totalAmount || installment.price || 0).toLocaleString()}
+                            </Text>
+                          </View>
                         </View>
 
                         <View style={styles.footerRow}>
@@ -464,6 +471,12 @@ const styles = StyleSheet.create({
 
   scrollView: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 80 },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
 
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
@@ -472,29 +485,30 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    width: '48%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
     overflow: 'hidden',
+    marginBottom: 0,
   },
   cardInner: {
-    flexDirection: 'row',
-    height: 150,
+    flexDirection: 'column',
   },
   imageWrapper: {
-    width: 120,
+    width: '100%',
+    height: 160,
     backgroundColor: '#F9F9F9',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   cardImage: {
-    width: '90%',
-    height: '90%',
+    width: '100%',
+    height: '100%',
   },
   placeholderImage: {
     width: '100%',
@@ -518,38 +532,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cardInfo: {
-    flex: 1,
     padding: 12,
+    minHeight: 120,
     justifyContent: 'space-between',
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 4,
+    minHeight: 36,
   },
   cardDesc: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
+    marginBottom: 6,
   },
   priceContainer: {
     marginTop: 4,
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+    marginBottom: 4,
   },
   priceLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#888',
   },
   priceValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: RED_PRIMARY,
+  },
+  cashPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cashPriceLabel: {
+    fontSize: 10,
+    color: '#888',
+  },
+  cashPriceValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
   },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   durationBadge: {
     flexDirection: 'row',
@@ -567,16 +604,16 @@ const styles = StyleSheet.create({
   },
   viewBtn: {
     backgroundColor: RED_PRIMARY,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   viewBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   filterButton: {

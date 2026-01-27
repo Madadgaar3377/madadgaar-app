@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { colors } from '@/theme';
 
 const RED_PRIMARY = '#D32F2F';
@@ -46,7 +46,11 @@ export const PageLoader: React.FC<PageLoaderProps> = ({
         <View style={styles.loaderCircle}>
           <ActivityIndicator size="large" color={RED_PRIMARY} />
         </View>
-        {message && <View style={styles.messageContainer} />}
+        {message && (
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageText}>{message}</Text>
+          </View>
+        )}
       </Animated.View>
     </View>
   );
@@ -65,8 +69,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#FFFFFF',
-    zIndex: 1000,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    zIndex: 9999,
+    elevation: 9999,
   },
   loaderContainer: {
     alignItems: 'center',
@@ -87,6 +92,12 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginTop: 16,
+  },
+  messageText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    textAlign: 'center',
   },
 });
 

@@ -52,13 +52,20 @@ export const applyProperty = async (
   payload: ApplyPropertyPayload
 ): Promise<ApplyPropertyResponse> => {
   try {
+    console.log('Sending property application:', payload);
     const response = await api.post<ApplyPropertyResponse>('/applyProperty', payload, {
       headers: {
         'Content-Type': 'application/json',
       },
     });
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || response.data.error || 'Failed to apply for property');
+    }
+    
     return response.data;
   } catch (error: any) {
+    console.error('Property application API error:', error);
     const errorResponse: ApplyPropertyResponse = {
       success: false,
       message: error.response?.data?.message || error.message || 'Failed to apply for property',

@@ -19,6 +19,7 @@ import { OTPInput } from '@/components/common/OTPInput';
 import { colors, spacing } from '@/theme';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const RED_PRIMARY = '#D32F2F';
 const RED_LIGHT = '#FFEBEE';
@@ -112,6 +113,7 @@ export default function OtpScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      {loading && <PageLoader fullScreen message="Verifying account..." />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
