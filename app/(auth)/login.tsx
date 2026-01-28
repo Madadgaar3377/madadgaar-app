@@ -94,7 +94,17 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
-      {loading && <PageLoader fullScreen message="Signing in..." />}
+      
+      {/* Full screen loader overlay */}
+      {loading && (
+        <View style={styles.loaderOverlay}>
+          <View style={styles.loaderContainer}>
+            <PageLoader fullScreen={false} message="Signing in..." />
+            <Text style={styles.loaderText}>Please wait...</Text>
+          </View>
+        </View>
+      )}
+      
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -139,6 +149,7 @@ export default function LoginScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                 </View>
                 {formErrors.email && (
@@ -173,10 +184,12 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={loading}
                   >
                     <Ionicons
                       name={showPassword ? 'eye' : 'eye-off'}
@@ -193,12 +206,13 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={styles.forgotPasswordContainer}
                 onPress={() => router.push('/(auth)/forgot-password')}
+                disabled={loading}
               >
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
 
               <Button
-                title="Sign In"
+                title={loading ? "Signing In..." : "Sign In"}
                 onPress={handleLogin}
                 loading={loading}
                 disabled={loading}
@@ -209,7 +223,10 @@ export default function LoginScreen() {
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+              <TouchableOpacity 
+                onPress={() => router.push('/(auth)/signup')}
+                disabled={loading}
+              >
                 <Text style={styles.signupLink}>Sign up</Text>
               </TouchableOpacity>
             </View>
@@ -324,5 +341,34 @@ const styles = StyleSheet.create({
     color: RED_PRIMARY,
     fontSize: 15,
     fontWeight: '700',
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loaderContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+    minWidth: 200,
+  },
+  loaderText: {
+    marginTop: spacing.md,
+    fontSize: 16,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
   },
 });

@@ -32,12 +32,12 @@ export default function OnboardingScreen() {
 
   const handleSkip = async () => {
     await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
-    router.replace('/(auth)/login');
+    router.replace('/(tabs)');
   };
 
   const handleGetStarted = async () => {
     await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
-    router.replace('/(auth)/login');
+    router.replace('/(tabs)');
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

@@ -362,6 +362,22 @@ export default function ProfileScreen() {
 
               <TouchableOpacity
                 style={styles.menuItem}
+                onPress={() => router.push('/chat' as any)}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.accent} />
+                </View>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>Chat with Admin</Text>
+                  <Text style={styles.menuDesc}>Get instant support</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => router.push('/(tabs)/dashboard' as any)}
               >
                 <View style={styles.menuIconContainer}>

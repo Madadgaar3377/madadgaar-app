@@ -40,6 +40,11 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   logoContainer: {
     height: 100,
     justifyContent: 'center',
@@ -56,6 +61,20 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chatButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: RED_PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: RED_PRIMARY,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    marginRight: spacing.xs, // Add spacing between chat and profile
   },
   userIconButton: {
     marginLeft: spacing.md,
@@ -89,12 +108,15 @@ const styles = StyleSheet.create({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { name, profileImageUrl, userProfile, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { name, profileImageUrl, userProfile, isAuthenticated, token, user } = useAppSelector((state) => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
   const [banners, setBanners] = useState<OfferBannerType[]>([]);
   const [loadingBanners, setLoadingBanners] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  // Check if user is logged in (either isAuthenticated or has token/user)
+  const isLoggedIn = isAuthenticated || !!token || !!user;
 
   const getInitials = () => {
     if (name) {
@@ -174,8 +196,23 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {isAuthenticated ? (
+          <View style={styles.headerRight}>
+            {/* Chat Button - Shows when user is logged in */}
+            {isLoggedIn && (
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('Chat button pressed, isLoggedIn:', isLoggedIn);
+                  router.push('/chat');
+                }}
+                style={styles.chatButton}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chatbubble-ellipses" size={20} color={WHITE} />
+              </TouchableOpacity>
+            )}
+            
+            {/* Profile or Login Button */}
+            {isLoggedIn ? (
               <TouchableOpacity
                 onPress={handleProfilePress}
                 style={styles.profileButton}

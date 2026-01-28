@@ -184,14 +184,14 @@ export const FloatingTabBar: React.FC = () => {
     const isHome = tab.name === 'home';
 
     if (isHome) {
-      // Home button - same line but visually distinct
+      // Home button - elevated above the navbar
       return (
         <Animated.View
           key={tab.name}
           style={[
             styles.homeButtonContainer,
             {
-              transform: [{ scale: homeButtonScale }],
+              transform: [{ scale: homeButtonScale }, { translateY: -20 }], // Elevated by 20px
               opacity: homeButtonOpacity,
             },
           ]}
@@ -201,7 +201,7 @@ export const FloatingTabBar: React.FC = () => {
             onPress={() => handleTabPress(tab, index)}
             activeOpacity={0.85}
           >
-            <Ionicons name="home" size={22} color={WHITE} />
+            <Ionicons name="home" size={26} color={WHITE} />
           </TouchableOpacity>
         </Animated.View>
       );
@@ -343,20 +343,23 @@ const styles = StyleSheet.create({
   homeButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 56,
+    zIndex: 10, // Ensure it appears above other elements
   },
   homeButton: {
-    width: 48, // Slightly larger than other icons but same line
-    height: 48,
-    borderRadius: 24,
+    width: 56, // Larger elevated button
+    height: 56,
+    borderRadius: 28,
     backgroundColor: RED_PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: RED_PRIMARY,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 4,
+    borderColor: WHITE, // White border for better separation
   },
 });

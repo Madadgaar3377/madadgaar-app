@@ -105,7 +105,17 @@ export default function SignupScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
-      {loading && <PageLoader fullScreen message="Creating account..." />}
+      
+      {/* Full screen loader overlay */}
+      {loading && (
+        <View style={styles.loaderOverlay}>
+          <View style={styles.loaderContainer}>
+            <PageLoader fullScreen={false} message="Creating account..." />
+            <Text style={styles.loaderText}>Please wait...</Text>
+          </View>
+        </View>
+      )}
+      
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -149,6 +159,7 @@ export default function SignupScreen() {
                     }}
                     autoCapitalize="words"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                 </View>
                 {formErrors.name && (
@@ -184,6 +195,7 @@ export default function SignupScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                 </View>
                 {formErrors.email && (
@@ -217,6 +229,7 @@ export default function SignupScreen() {
                     }}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                 </View>
                 {formErrors.userName && (
@@ -251,10 +264,12 @@ export default function SignupScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!loading}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={loading}
                   >
                     <Ionicons
                       name={showPassword ? 'eye' : 'eye-off'}
@@ -269,7 +284,7 @@ export default function SignupScreen() {
               </View>
 
               <Button
-                title="Create Account"
+                title={loading ? "Creating Account..." : "Create Account"}
                 onPress={handleSignup}
                 loading={loading}
                 disabled={loading}
@@ -280,7 +295,10 @@ export default function SignupScreen() {
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+              <TouchableOpacity 
+                onPress={() => router.push('/(auth)/login')}
+                disabled={loading}
+              >
                 <Text style={styles.loginLink}>Login</Text>
               </TouchableOpacity>
             </View>
@@ -385,5 +403,34 @@ const styles = StyleSheet.create({
     color: RED_PRIMARY,
     fontSize: 15,
     fontWeight: '700',
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loaderContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
+    minWidth: 200,
+  },
+  loaderText: {
+    marginTop: spacing.md,
+    fontSize: 16,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
   },
 });
