@@ -1,0 +1,35 @@
+{
+  "project_info": {
+    "project_number": "268543187936",
+    "project_id": "madadgaar-f2090",
+    "storage_bucket": "madadgaar-f2090.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:268543187936:android:43fbc858fd3f837af2a985",
+        "android_client_info": {
+          "package_name": "com.anonymous.madadgaar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrprXq5BVn9OjLGNpkW0qZk99Zl0uGu_A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1",
+  "plugins": [
+    {
+      "id": "com.google.gms.google-services",
+      "version": "4.4.4"
+    }
+  ]
+}
