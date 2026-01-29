@@ -443,6 +443,22 @@ export default function ProfileScreen() {
 
               <View style={styles.divider} />
 
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => router.push('/terms-and-conditions' as any)}
+              >
+                <View style={styles.menuIconContainer}>
+                  <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+                </View>
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>Terms & Conditions</Text>
+                  <Text style={styles.menuDesc}>Read our terms and privacy policy</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+
+              <View style={styles.divider} />
+
               <TouchableOpacity style={styles.menuItem} onPress={async () => await dispatch(logout())}>
                 <View style={[styles.menuIconContainer, styles.logoutIconContainer]}>
                   <Ionicons name="log-out-outline" size={22} color={colors.error} />
@@ -455,7 +471,7 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.versionText}>
-            Version {Constants.expoConfig?.version || '1.0.1'}
+            Version {Constants.expoConfig?.version || Constants.manifest?.version || '1.0.2'}
           </Text>
         </Animated.View>
       </ScrollView>

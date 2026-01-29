@@ -10,10 +10,15 @@ import { OfferBanner } from '@/components/OfferBanner';
 import { CategoriesSection } from '@/components/CategoriesSection';
 import { InstallmentsSection } from '@/components/InstallmentsSection';
 import { PropertiesSection } from '@/components/PropertiesSection';
+import { LoansSection } from '@/components/LoansSection';
+import { StrategySection } from '@/components/StrategySection';
+import { Footer } from '@/components/common/Footer';
+import { NoInternet } from '@/components/common/NoInternet';
 import { getAllOffers, OfferBanner as OfferBannerType } from '@/services/banner.api';
 import { colors, spacing } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 
 const RED_PRIMARY = '#D32F2F';
 const RED_LIGHT = '#FFEBEE';
@@ -112,6 +117,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [banners, setBanners] = useState<OfferBannerType[]>([]);
   const [loadingBanners, setLoadingBanners] = useState(true);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -144,8 +150,31 @@ export default function HomeScreen() {
     ]).start();
   }, []);
 
+  // Check internet connectivity
+  useEffect(() => {
+    // Initial check
+    NetInfo.fetch().then(state => {
+      setIsConnected(state.isConnected);
+    });
+
+    // Subscribe to network state updates
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     const fetchBanners = async () => {
+      // Only fetch if connected
+      if (isConnected === false) {
+        setLoadingBanners(false);
+        return;
+      }
+
       try {
         setLoadingBanners(true);
         const fetchedBanners = await getAllOffers();
@@ -157,8 +186,10 @@ export default function HomeScreen() {
       }
     };
 
-    fetchBanners();
-  }, []);
+    if (isConnected !== null) {
+      fetchBanners();
+    }
+  }, [isConnected]);
 
   const handleProfilePress = () => {
     router.push('/(tabs)/profile');
@@ -171,6 +202,23 @@ export default function HomeScreen() {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
+
+  const handleRetry = () => {
+    NetInfo.fetch().then(state => {
+      setIsConnected(state.isConnected);
+    });
+  };
+
+  // Show no internet screen if not connected
+  if (isConnected === false) {
+    return (
+      <View style={styles.mainContainer}>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <NoInternet onRetry={handleRetry} />
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.mainContainer}>
@@ -298,6 +346,16 @@ export default function HomeScreen() {
             <InstallmentsSection limit={5} />
           </Animated.View>
 
+          {/* Loans Section */}
+          <Animated.View
+            style={[styles.sectionContainer, {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }]}
+          >
+            <LoansSection limit={5} />
+          </Animated.View>
+
           {/* Properties Section */}
           <Animated.View
             style={[styles.sectionContainer, {
@@ -306,6 +364,26 @@ export default function HomeScreen() {
             }]}
           >
             <PropertiesSection limit={5} />
+          </Animated.View>
+
+          {/* Strategy Section */}
+          <Animated.View
+            style={[styles.sectionContainer, {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }]}
+          >
+            <StrategySection />
+          </Animated.View>
+
+          {/* Footer */}
+          <Animated.View
+            style={[{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }]}
+          >
+            <Footer />
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

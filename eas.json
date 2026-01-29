@@ -15,7 +15,11 @@
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "NODE_ENV": "production"
       }
     },
     "production-aab": {

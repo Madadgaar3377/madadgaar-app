@@ -95,10 +95,24 @@ export const getConversationMessages = async (
         params: { page, limit },
       }
     );
-    return response.data || { success: true, data: { messages: [] } };
+    // Backend returns { success: true, data: messages[], pagination: {...} }
+    // So response.data.data is the messages array
+    const apiResponse = response.data;
+    if (apiResponse && apiResponse.success) {
+      return {
+        success: true,
+        data: apiResponse.data || [], // Messages array directly
+        pagination: apiResponse.pagination,
+      };
+    }
+    return { success: false, data: [], message: 'Failed to fetch messages' };
   } catch (error: any) {
     console.error('Error fetching messages:', error);
-    return { success: false, data: { messages: [] }, message: 'Failed to fetch messages' };
+    return { 
+      success: false, 
+      data: [], 
+      message: error.response?.data?.message || 'Failed to fetch messages' 
+    };
   }
 };
 
@@ -152,9 +166,17 @@ export const pollMessages = async (
         },
       }
     );
-    return response.data;
+    const apiResponse = response.data;
+    if (apiResponse && apiResponse.success) {
+      return {
+        success: true,
+        data: apiResponse.data || [], // Messages array directly
+        pagination: apiResponse.pagination,
+      };
+    }
+    return { success: false, data: [] };
   } catch (error: any) {
     console.error('Error polling messages:', error);
-    return { success: false, data: { messages: [] } };
+    return { success: false, data: [] };
   }
 };

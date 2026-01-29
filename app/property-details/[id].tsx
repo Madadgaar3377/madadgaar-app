@@ -1099,10 +1099,10 @@ export default function PropertyDetailScreen() {
             <View style={styles.bottomBar}>
                 <TouchableOpacity 
                     style={styles.contactButton}
-                    onPress={() => setShowContactForm(true)}
+                    onPress={() => setShowContactModal(true)}
                 >
-                    <Ionicons name="mail-outline" size={20} color="#fff" />
-                    <Text style={styles.contactButtonText}>Contact</Text>
+                    <Ionicons name="call-outline" size={20} color="#fff" />
+                    <Text style={styles.contactButtonText}>Contact Us</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={styles.applyButton}
